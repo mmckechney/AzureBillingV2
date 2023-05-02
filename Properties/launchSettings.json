@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AzureBillingV2": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7177"
+    }
+  }
+}

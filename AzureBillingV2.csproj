@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AzureBillingV2</RootNamespace>
+    <AssemblyVersion>2.0</AssemblyVersion>
+    <FileVersion>2.0</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="__blobstorage__\**" />
+    <EmbeddedResource Remove="__blobstorage__\**" />
+    <None Remove="__blobstorage__\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="__azurite_db_blob_extent__.json" />
+    <None Remove="__azurite_db_blob__.json" />
+    <None Remove="__azurite_db_queue_extent__.json" />
+    <None Remove="__azurite_db_queue__.json" />
+    <None Remove="__azurite_db_table__.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.8.2" />
+    <PackageReference Include="Azure.ResourceManager.Billing" Version="1.0.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.16.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.13.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.0.13" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.10.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="System.Threading.ExecutionContext" Alias="ExecutionContext" />
+  </ItemGroup>
+</Project>
