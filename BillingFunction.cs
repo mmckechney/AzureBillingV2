@@ -116,9 +116,7 @@ namespace AzureBillingV2
 
             var final = JsonSerializer.Serialize<FinalResults> (finalResults, new JsonSerializerOptions() { WriteIndented = true});
             
-            
-
-            var response = req.CreateResponse(HttpStatusCode.OK);
+            var response = req.CreateResponse(finalResults.HasFailures ? HttpStatusCode.FailedDependency : HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
 
             response.WriteString(final);
