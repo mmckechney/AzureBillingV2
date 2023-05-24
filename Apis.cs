@@ -15,6 +15,12 @@ using Microsoft.Extensions.Configuration;
 using Grpc.Core;
 using System.Net;
 using System.ComponentModel.Design;
+using Microsoft.Extensions.Primitives;
+using System.Net.Http.Json;
+using System.Diagnostics;
+using CsvHelper;
+using System.Globalization;
+using Google.Protobuf.WellKnownTypes;
 
 namespace AzureBillingV2
 {
@@ -50,12 +56,20 @@ namespace AzureBillingV2
             }
         }
 
-        internal async Task<string> GetTokenString()
+        internal async Task<string> GetTokenString(string tenantId = "")
         {
 
             if (_tokenCred == null)
             {
-                _tokenCred = new DefaultAzureCredential();
+                
+                if (!string.IsNullOrEmpty(tenantId))
+                {
+                    _tokenCred = new DefaultAzureCredential(new DefaultAzureCredentialOptions() { TenantId = tenantId });
+                }
+                else
+                {
+                    _tokenCred = new DefaultAzureCredential();
+                }
             }
 
             if (_accessToken == null)
@@ -66,19 +80,19 @@ namespace AzureBillingV2
             return _accessToken.Value.Token;
 
         }
-        public async Task<AuthenticationHeaderValue> GetAuthHeader()
+        public async Task<AuthenticationHeaderValue> GetAuthHeader(string tenantId)
         {
-            var tokenString = await GetTokenString();
+            var tokenString = await GetTokenString(tenantId);
             return new AuthenticationHeaderValue("Bearer", tokenString);
         }
 
 
-        public async Task<ReportTracking> RequestCostDetailsReport(ReportTracking tracker, DateTime start, DateTime end, int iteration = 0)
+        public async Task<ReportTracking> RequestCostDetailsReport(ReportTracking tracker, DateTime start, DateTime end, string tenantId = "", int iteration = 0)
         {
             try
             {
                 var apiUrl = generateCostDetails.Replace("{subscriptionId}", tracker.SubscriptionId);
-                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader();
+                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
 
                 var data = new CostDetailsRequestData()
                 {
@@ -121,7 +135,7 @@ namespace AzureBillingV2
                         {
                             Thread.Sleep(randomGen.Next(4000,8000));
                         }
-                        return await RequestCostDetailsReport(tracker, start, end, iteration++);
+                        return await RequestCostDetailsReport(tracker, start, end, tenantId, iteration++);
                     }
                     else
                     {
@@ -139,11 +153,14 @@ namespace AzureBillingV2
             return tracker;
         }
 
-        public async Task<ReportTracking> GetReportStatusBlobUrl(ReportTracking tracker, int iteration = 0)
+       
+   
+
+        public async Task<ReportTracking> GetReportStatusBlobUrl(ReportTracking tracker, string tenantId = "", int iteration = 0)
         {
             try
             {
-                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader();
+                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(tracker.ReportStatusUrl);
                 if (result.IsSuccessStatusCode)
                 {
@@ -158,7 +175,7 @@ namespace AzureBillingV2
                     else if (iteration < 10)
                     {
                         Thread.Sleep(2000);
-                        return await GetReportStatusBlobUrl(tracker, iteration++);
+                        return await GetReportStatusBlobUrl(tracker, tenantId, iteration++);
                     }
                 }
             }
@@ -167,7 +184,7 @@ namespace AzureBillingV2
                 if (iteration < 10)
                 {
                     Thread.Sleep(2000);
-                    return await GetReportStatusBlobUrl(tracker, iteration++);
+                    return await GetReportStatusBlobUrl(tracker, tenantId, iteration++);
                 }
                 else
                 {
@@ -213,7 +230,9 @@ namespace AzureBillingV2
 
         }
 
-        public async Task<(List<ReportTracking>, string)> GetListOfSubscriptions(string managementGroupId)
+
+
+        public async Task<(List<ReportTracking>, string)> GetListOfSubscriptions(string managementGroupId, string tenantId = "")
         {
             string failureMessage = "";
             try
@@ -221,7 +240,7 @@ namespace AzureBillingV2
 
 
                 var url = $"https://management.azure.com/providers/Microsoft.Management/getEntities?api-version=2020-05-01&%24filter=name%20eq%20%27{managementGroupId}%27";
-                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader();
+                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.PostAsync(url, null);
                 if (result.IsSuccessStatusCode)
                 {
@@ -247,5 +266,133 @@ namespace AzureBillingV2
             }
             return (new List<ReportTracking>(), failureMessage);
         }
+
+
+        #region Methods for Legacy Rate Card
+
+        public async Task<List<BillingData>> GetReportCSVContents(string blobSasUrl)
+        {
+            try
+            {
+                List<BillingData> billData = new List<BillingData>();
+                var sourceUri = new Uri(blobSasUrl);
+                BlobClient targetClient = new BlobClient(sourceUri);
+                var content = await targetClient.DownloadContentAsync();
+                var csvContent = Encoding.UTF8.GetString(content.Value.Content);
+                using (var sr = new StringReader(csvContent))
+                {
+
+                    var csv = new CsvReader(sr,new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null});
+                    //csv.Context.RegisterClassMap<BillingData>();
+                    billData = csv.GetRecords<BillingData>().ToList();
+                }
+
+                return billData;
+            }
+            catch(Exception exe)
+            {
+                _logger.LogError(exe, $"Unable to read file at {blobSasUrl}");
+                return null;
+            }
+        }
+
+
+        public async Task<ReportTracking> GetRateCardInformation(ReportTracking tracker, string tenantId = "")
+        {
+            var rateCard = await GetRateCardInformation(tracker.SubscriptionId, tenantId);
+            tracker.RateCard = rateCard;
+            return tracker;
+
+        }
+        public async Task<RateCardData> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US")
+        {
+            try
+            {
+                var apiUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq '{offerDurableId}' and Currency eq '{currency}' and Locale eq '{locale}' and RegionInfo eq '{regionInfo}'";
+                httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
+                var result = await httpClient.GetAsync(apiUrl);
+                if (result.IsSuccessStatusCode)
+                {
+                    var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
+                    return rateData;
+                }
+                else
+                {
+                    _logger.LogError($"Unable to get rate card information for subscription {subscriptionId}. {result.ReasonPhrase}");
+                }
+            }
+            catch (Exception exe)
+            {
+                _logger.LogError(exe, $"Unable to get rate card information for subscription {subscriptionId}");
+            }
+            return null;
+        }
+
+        public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker)
+        {
+            var costReport = await GetReportCSVContents(tracker.ReportBlobSas);
+
+            foreach (var record in costReport)
+            {
+
+                var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                if (rate != null)
+                {
+                    var reportCost = record.costInUsd;
+                    var calcCost = rate.MeterRates.BaseRate * record.quantity;
+                    record.costInUsd = calcCost;
+                }
+
+            }
+            tracker.CostInfo = costReport;
+            return tracker;
+        }
+
+        public async Task<ReportTracking> SaveMappedDataToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
+        {
+            try
+            {
+                containerName = containerName.ToLower();
+                BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
+                containerClient.CreateIfNotExists();
+
+                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.DestinationBlobName);
+
+
+                var sb = new StringBuilder();
+                using (var writer = new StringWriter(sb))
+                {
+                    using (var csv = new CsvWriter(writer, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null, BadDataFound = null, }))
+                    {
+                        csv.WriteRecords<BillingData>(tracker.CostInfo.AsEnumerable());
+                    }
+                }
+
+                var writeOperation = await targetClient.UploadAsync(BinaryData.FromString(sb.ToString()),true);
+
+                if (writeOperation.GetRawResponse().Status < 300)
+                {
+                    tracker.DestinationBlobName = targetClient.Uri.ToString();
+                    tracker.StatusMessage = "Successfully saved report to Blob storage";
+                    return tracker;
+                }
+                else
+                {
+                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.DestinationBlobName}': {writeOperation.GetRawResponse().ReasonPhrase}";
+                    _logger.LogError(tracker.StatusMessage);
+                }
+
+            }
+            catch (Exception exe)
+            {
+                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.DestinationBlobName} -- {exe.Message}";
+                _logger.LogError(exe, tracker.StatusMessage);
+            }
+            tracker.Success = false;
+            return tracker;
+
+        }
+
+        #endregion
     }
 }

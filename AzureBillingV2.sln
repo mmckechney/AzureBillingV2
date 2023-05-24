@@ -5,6 +5,8 @@ VisualStudioVersion = 17.5.33530.505
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzureBillingV2", "AzureBillingV2.csproj", "{2DA908EC-9E56-45B4-9FA8-4A1131C09178}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureBilling.Test", "..\AzureBilling.Test\AzureBilling.Test.csproj", "{0976E38E-3C10-4B50-8A4A-D9076B6D2345}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{2DA908EC-9E56-45B4-9FA8-4A1131C09178}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2DA908EC-9E56-45B4-9FA8-4A1131C09178}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2DA908EC-9E56-45B4-9FA8-4A1131C09178}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0976E38E-3C10-4B50-8A4A-D9076B6D2345}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0976E38E-3C10-4B50-8A4A-D9076B6D2345}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0976E38E-3C10-4B50-8A4A-D9076B6D2345}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0976E38E-3C10-4B50-8A4A-D9076B6D2345}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -29,5 +29,11 @@ namespace AzureBillingV2.Models
 
         [JsonPropertyName("statusMessage")]
         public string StatusMessage { get; set; }
+
+        [JsonIgnore]
+        public RateCardData RateCard { get; set; }
+
+        [JsonIgnore]
+        public List<BillingData> CostInfo { get; set; }
     }
 }
