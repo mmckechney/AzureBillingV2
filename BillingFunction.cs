@@ -88,7 +88,7 @@ namespace AzureBillingV2
             List<Task<ReportTracking>> reportTasks = new List<Task<ReportTracking>>();
             foreach(var task in successfulReports)
             {
-                reportTasks.Add(apis.GetReportStatusBlobUrl(task));
+                reportTasks.Add(apis.GetReportStatusBlobUrl(task,tenantId));
             }
             var reportResults = await Task.WhenAll(reportTasks.ToArray());
 
