@@ -161,6 +161,7 @@ namespace AzureBillingV2
         {
             try
             {
+                iteration = iteration + 1;
                 _logger.LogInformation($"Checking status of cost report for subscription {tracker.SubscriptionId}, Iteration: {iteration}");
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(tracker.ReportStatusUrl);
@@ -176,8 +177,9 @@ namespace AzureBillingV2
                     }
                     else if (iteration < 10)
                     {
-                        Thread.Sleep(2000);
-                        return await GetReportStatusBlobUrl(tracker, tenantId, iteration++);
+                        _logger.LogInformation($"Report status for subscription {tracker.SubscriptionId} is: {status.Status.Trim()}. Checking again...");
+                        Thread.Sleep(3000);
+                        return await GetReportStatusBlobUrl(tracker, tenantId, iteration);
                     }
                 }
             }
@@ -185,8 +187,9 @@ namespace AzureBillingV2
             {
                 if (iteration < 10)
                 {
-                    Thread.Sleep(2000);
-                    return await GetReportStatusBlobUrl(tracker, tenantId, iteration++);
+                    _logger.LogInformation($"Error checking status for subscription {tracker.SubscriptionId}: {exe.Message}. Checking again...");
+                    Thread.Sleep(3000);
+                    return await GetReportStatusBlobUrl(tracker, tenantId, iteration);
                 }
                 else
                 {
