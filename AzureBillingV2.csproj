@@ -14,6 +14,11 @@
     <EmbeddedResource Remove="__blobstorage__\**" />
     <None Remove="__blobstorage__\**" />
   </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="AzureBillingV2.Test\**" />
+		<EmbeddedResource Remove="AzureBillingV2.Test\**" />
+		<None Remove="AzureBillingV2.Test\**" />
+	</ItemGroup>
   <ItemGroup>
     <None Remove="__azurite_db_blob_extent__.json" />
     <None Remove="__azurite_db_blob__.json" />
