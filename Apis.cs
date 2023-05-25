@@ -91,6 +91,7 @@ namespace AzureBillingV2
         {
             try
             {
+                _logger.LogInformation($"Requesting cost report for subscription {tracker.SubscriptionId}");
                 var apiUrl = generateCostDetails.Replace("{subscriptionId}", tracker.SubscriptionId);
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
 
@@ -160,6 +161,7 @@ namespace AzureBillingV2
         {
             try
             {
+                _logger.LogInformation($"Checking status of cost report for subscription {tracker.SubscriptionId}, Iteration: {iteration}");
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(tracker.ReportStatusUrl);
                 if (result.IsSuccessStatusCode)
@@ -200,6 +202,7 @@ namespace AzureBillingV2
         {
             try
             {
+                _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {tracker.DestinationBlobName}");
                 containerName = containerName.ToLower();
                 BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
                 containerClient.CreateIfNotExists();
@@ -299,6 +302,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> GetRateCardInformation(ReportTracking tracker, string tenantId = "")
         {
+            _logger.LogInformation($"Getting rate card information for subscription {tracker.SubscriptionId}");
             var rateCard = await GetRateCardInformation(tracker.SubscriptionId, tenantId);
             tracker.RateCard = rateCard;
             return tracker;
@@ -330,6 +334,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker)
         {
+            _logger.LogInformation($"Mapping rate card to cost report for subscription {tracker.SubscriptionId}");
             var costReport = await GetReportCSVContents(tracker.ReportBlobSas);
 
             foreach (var record in costReport)
@@ -352,6 +357,7 @@ namespace AzureBillingV2
         {
             try
             {
+                _logger.LogInformation($"Saving mapped cost data for subscription {tracker.SubscriptionId} to {tracker.DestinationBlobName}");
                 containerName = containerName.ToLower();
                 BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
                 containerClient.CreateIfNotExists();
