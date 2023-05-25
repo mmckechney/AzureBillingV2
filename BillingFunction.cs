@@ -84,6 +84,7 @@ namespace AzureBillingV2
             _logger.LogInformation($"Found {successfulReports.Count()} successful generation tasks");
 
             // Get list of report URIs
+            _logger.LogInformation($"Checking report status and getting report Sas URLs");
             List<Task<ReportTracking>> reportTasks = new List<Task<ReportTracking>>();
             foreach(var task in successfulReports)
             {
@@ -94,6 +95,7 @@ namespace AzureBillingV2
             //Update lists of success and failed.
             successfulReports = reportResults.Where(t => t.Success).ToList();
             failedReports.AddRange(reportResults.Where(t => !t.Success));
+            _logger.LogInformation($"Found {successfulReports.Count()} successful reports");
 
             var containerName = config["ContainerName"];
             var targetConnectionString = config["StorageConnectionString"];
@@ -140,8 +142,9 @@ namespace AzureBillingV2
             else
             {
 
-                
+
                 // Copy Reports to Blob Storage
+                _logger.LogInformation($"Copying {successfulReports.Count()} reports to destination Blob Container");
                 var blobCopyTasks = new List<Task<ReportTracking>>();
                 foreach (var tracker in successfulReports)
                 {
@@ -154,6 +157,7 @@ namespace AzureBillingV2
                 //Update lists of success and failed.
                 successfulReports = blobCopyResults.Where(t => t.Success).ToList();
                 failedReports.AddRange(blobCopyResults.Where(t => !t.Success));
+                _logger.LogInformation($"Successfully copied {successfulReports.Count()} reports to destination Blob Container");
             }
 
             
