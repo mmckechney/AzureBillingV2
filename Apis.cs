@@ -175,6 +175,10 @@ namespace AzureBillingV2
                         tracker.ReportBlobSas = blobUrl;
                         return tracker;
                     }
+                    else if (status.Status.Trim().ToLower() == "nodatafound")
+                    {
+                        tracker.StatusMessage = $"Cost report for subscription {tracker.SubscriptionId} has no data. Skipping...";
+                    }
                     else if (iteration < 10)
                     {
                         _logger.LogInformation($"Report status for subscription {tracker.SubscriptionId} is: {status.Status.Trim()}. Checking again...");
