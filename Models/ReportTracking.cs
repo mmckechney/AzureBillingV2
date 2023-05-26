@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Azure.Storage.Blobs.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -34,7 +36,7 @@ namespace AzureBillingV2.Models
         public bool Success { get; set; } = true;
 
         [JsonPropertyName("statusMessage")]
-        public string StatusMessage { get; set; }
+        public List<string> StatusMessage { get; set; } = new List<string>();
 
         [JsonIgnore]
         public RateCardData RateCard { get; set; }
@@ -42,5 +44,12 @@ namespace AzureBillingV2.Models
         [JsonIgnore]
         public List<BillingData> CostInfo { get; set; }
 
+    }
+    public static class Extensions
+    {
+        public static string ToLines(this List<string> lst)
+        {
+            return string.Join(Environment.NewLine, lst);
+        }
     }
 }

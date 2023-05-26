@@ -118,8 +118,8 @@ namespace AzureBillingV2
                     }
                     else
                     {
-                        tracker.StatusMessage = $"Unable to request cost details for subscription {tracker.SubscriptionId}. Location header was empty";
-                        _logger.LogError(tracker.StatusMessage);
+                        tracker.StatusMessage.Add($"Unable to request cost details for subscription {tracker.SubscriptionId}. Location header was empty");
+                        _logger.LogError(tracker.StatusMessage.ToLines());
                     }
                 }
                 else
@@ -140,15 +140,15 @@ namespace AzureBillingV2
                     }
                     else
                     {
-                        tracker.StatusMessage = $"Unable to request cost details for subscription {tracker.SubscriptionId}. {result.ReasonPhrase}";
-                        _logger.LogError(tracker.StatusMessage);
+                        tracker.StatusMessage.Add($"Unable to request cost details for subscription {tracker.SubscriptionId}. {result.ReasonPhrase}");
+                        _logger.LogError(tracker.StatusMessage.ToLines());
                     }
                 }
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage = $"Failed to request cost report generation for subscription: {tracker.SubscriptionId} -- {exe.Message}";
-                _logger.LogError(exe, tracker.StatusMessage);
+                tracker.StatusMessage.Add($"Failed to request cost report generation for subscription: {tracker.SubscriptionId} -- {exe.Message}");
+                _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
             tracker.Success = false;
             return tracker;
@@ -177,7 +177,7 @@ namespace AzureBillingV2
                     }
                     else if (status.Status.Trim().ToLower() == "nodatafound")
                     {
-                        tracker.StatusMessage = $"Cost report for subscription {tracker.SubscriptionId} has no data. Skipping...";
+                        tracker.StatusMessage.Add($"Cost report for subscription {tracker.SubscriptionId} has no data. Skipping...");
                     }
                     else if (iteration < 10)
                     {
@@ -197,8 +197,8 @@ namespace AzureBillingV2
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to get Report Status for subscription: {tracker.SubscriptionId} -- {exe.Message}";
-                    _logger.LogError(exe, tracker.StatusMessage);
+                    tracker.StatusMessage.Add($"Failed to get Report Status for subscription: {tracker.SubscriptionId} -- {exe.Message}");
+                    _logger.LogError(exe, tracker.StatusMessage.ToLines());
                 }
             }
             tracker.Success = false;
@@ -221,20 +221,20 @@ namespace AzureBillingV2
                 if (result.GetRawResponse().Status < 300)
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
-                    tracker.StatusMessage += "Successfully saved report to Blob storage. ";
+                    tracker.StatusMessage.Add("Successfully saved report to Blob storage.");
 
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.CostDataBlobName}': {result.GetRawResponse().ReasonPhrase}";
-                    _logger.LogError(tracker.StatusMessage);
+                    tracker.StatusMessage.Add($"Failed to copy target blob file '{tracker.CostDataBlobName}': {result.GetRawResponse().ReasonPhrase}");
+                    _logger.LogError(tracker.StatusMessage.ToLines());
                 }
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}";
-                _logger.LogError(exe, tracker.StatusMessage);
+                tracker.StatusMessage.Add($"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}");
+                _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
             tracker.Success = false;
             return tracker;
@@ -402,20 +402,20 @@ namespace AzureBillingV2
                 if (writeOperation.GetRawResponse().Status < 300)
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
-                    tracker.StatusMessage += "Successfully saved rate card mapped report to Blob storage. ";
+                    tracker.StatusMessage.Add("Successfully saved rate card mapped report to Blob storage.");
 
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.CostDataBlobName}': {writeOperation.GetRawResponse().ReasonPhrase}";
-                    _logger.LogError(tracker.StatusMessage);
+                    tracker.StatusMessage.Add($"Failed to copy target blob file '{tracker.CostDataBlobName}': {writeOperation.GetRawResponse().ReasonPhrase}");
+                    _logger.LogError(tracker.StatusMessage.ToLines());
                 }
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}";
-                _logger.LogError(exe, tracker.StatusMessage);
+                tracker.StatusMessage.Add($"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}");
+                _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
             tracker.Success = false;
             return tracker;
@@ -434,19 +434,19 @@ namespace AzureBillingV2
                 if (rateCardClientWrite.GetRawResponse().Status < 300)
                 {
                     tracker.RateCardBlobName = rateCardClient.Uri.ToString();
-                    tracker.StatusMessage += "Successfully saved rate card to Blob storage. ";
+                    tracker.StatusMessage.Add("Successfully saved rate card to Blob storage.");
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to copy rate card blob file '{tracker.RateCardBlobName}': {rateCardClientWrite.GetRawResponse().ReasonPhrase}";
-                    _logger.LogError(tracker.StatusMessage);
+                    tracker.StatusMessage.Add($"Failed to copy rate card blob file '{tracker.RateCardBlobName}': {rateCardClientWrite.GetRawResponse().ReasonPhrase}");
+                    _logger.LogError(tracker.StatusMessage.ToLines());
                 }
             }
             catch (Exception rateExe)
             {
-                tracker.StatusMessage = $"Failed to copy rate card blob file: {tracker.RateCardBlobName} -- {rateExe.Message}";
-                _logger.LogError(rateExe, tracker.StatusMessage);
+                tracker.StatusMessage.Add($"Failed to copy rate card blob file: {tracker.RateCardBlobName} -- {rateExe.Message}");
+                _logger.LogError(rateExe, tracker.StatusMessage.ToLines());
             }
             tracker.Success = false;
             return tracker;
