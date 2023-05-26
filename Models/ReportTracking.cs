@@ -15,6 +15,9 @@ namespace AzureBillingV2.Models
         [JsonPropertyName("subscriptionId")]
         public string SubscriptionId { get; set; }
 
+        [JsonPropertyName("tenantId")]
+        public string TenantId { get; set; }
+
         [JsonPropertyName("reportStatusUrl")]
         public string ReportStatusUrl { get; set; }
 
