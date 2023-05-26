@@ -21,8 +21,11 @@ namespace AzureBillingV2.Models
         [JsonPropertyName("reportBlobSas")]
         public string ReportBlobSas { get; set; }
 
-        [JsonPropertyName("destinationBlobName")]
-        public string DestinationBlobName { get; set; }
+        [JsonPropertyName("costDataBlobName")]
+        public string CostDataBlobName { get; set; }
+
+        [JsonPropertyName("rateCardBlobName")]
+        public string RateCardBlobName { get; set; }
 
         [JsonPropertyName("success")]
         public bool Success { get; set; } = true;
@@ -35,5 +38,6 @@ namespace AzureBillingV2.Models
 
         [JsonIgnore]
         public List<BillingData> CostInfo { get; set; }
+
     }
 }
