@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Transactions;
 using System;
+using System.Diagnostics;
 
 namespace AzureBillingV2
 {
@@ -36,7 +37,12 @@ namespace AzureBillingV2
             var tenantId = config["TenantId"];
             bool useLegacyRateCard;
             bool.TryParse(config["UseLegacyRateCard"], out useLegacyRateCard);
-            
+            bool saveRateCardData;
+            if(!bool.TryParse(config["SaveRateCardData"], out saveRateCardData))
+            {
+                saveRateCardData = true;
+            }
+
             finalResults.ManagementGroupId = managementGroupId;
 
 
@@ -130,6 +136,7 @@ namespace AzureBillingV2
                 foreach (var tracker in successfulReports)
                 {
                     tracker.DestinationBlobName = $"{startDate.ToString("yyyy-MM-dd")}/Billing-{tracker.SubscriptionId}.csv";
+              
                     writeTasks.Add(apis.SaveMappedDataToStorage(tracker,containerName, targetConnectionString));
                 }
                 var writeResults = await Task.WhenAll(writeTasks.ToArray());
@@ -137,6 +144,21 @@ namespace AzureBillingV2
                 successfulReports = mappingResults.Where(t => t.Success).ToList();
                 failedReports.AddRange(rateCardResults.Where(t => !t.Success));
 
+
+                if (saveRateCardData)
+                {
+                    _logger.LogInformation($"Saving rate card data for {successfulReports.Count()} subscriptions");
+                    var rateCardBlobTasks = new List<Task<ReportTracking>>();
+                    foreach (var tracker in successfulReports)
+                    {
+                        tracker.RateCardBlobName = $"{startDate.ToString("yyyy-MM-dd")}/RateCard-{tracker.SubscriptionId}.json";
+                        rateCardBlobTasks.Add(apis.SaveRateCardToStorage(tracker, containerName, targetConnectionString));
+                    }
+                    var rateCardBlobResults = await Task.WhenAll(rateCardBlobTasks.ToArray());
+                    //Update lists of success and failed.
+                    successfulReports = rateCardBlobResults.Where(t => t.Success).ToList();
+                    failedReports.AddRange(rateCardBlobResults.Where(t => !t.Success));
+                }
 
             }
             else

@@ -209,30 +209,30 @@ namespace AzureBillingV2
         {
             try
             {
-                _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {tracker.DestinationBlobName}");
+                _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {tracker.CostDataBlobName}");
                 containerName = containerName.ToLower();
                 BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
                 containerClient.CreateIfNotExists();
                 
-                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.DestinationBlobName);
+                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.CostDataBlobName);
                 var sourceUri = new Uri(tracker.ReportBlobSas);
                 var copyOperation = await targetClient.StartCopyFromUriAsync(sourceUri);
                 var result = await copyOperation.WaitForCompletionAsync();
                 if (result.GetRawResponse().Status < 300)
                 {
-                    tracker.DestinationBlobName = targetClient.Uri.ToString();
+                    tracker.CostDataBlobName = targetClient.Uri.ToString();
                     tracker.StatusMessage = "Successfully saved report to Blob storage";
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.DestinationBlobName}': {result.GetRawResponse().ReasonPhrase}";
+                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.CostDataBlobName}': {result.GetRawResponse().ReasonPhrase}";
                     _logger.LogError(tracker.StatusMessage);
                 }
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.DestinationBlobName} -- {exe.Message}";
+                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}";
                 _logger.LogError(exe, tracker.StatusMessage);
             }
             tracker.Success = false;
@@ -343,17 +343,25 @@ namespace AzureBillingV2
         {
             _logger.LogInformation($"Mapping rate card to cost report for subscription {tracker.SubscriptionId}");
             var costReport = await GetReportCSVContents(tracker.ReportBlobSas);
-
+            
             foreach (var record in costReport)
             {
-
-                var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
-                if (rate != null)
+                try
                 {
-                    var reportCost = record.costInUsd;
-                    var calcCost = rate.MeterRates.BaseRate * record.quantity;
-                    record.costInUsd = calcCost;
+                    var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                    if (rate != null)
+                    {
+                        var reportCost = record.costInUsd;
+                        var calcCost = rate.MeterRates.BaseRate * record.quantity;
+                        record.costInUsd = calcCost;
+                        record.costInBillingCurrency = calcCost;    
+                    }
                 }
+                catch (Exception exe)
+                {
+                    _logger.LogWarning($"Unable to map rate card to cost report for meterid {record.meterId}. {exe.Message}");
+                }
+                
 
             }
             tracker.CostInfo = costReport;
@@ -364,12 +372,12 @@ namespace AzureBillingV2
         {
             try
             {
-                _logger.LogInformation($"Saving mapped cost data for subscription {tracker.SubscriptionId} to {tracker.DestinationBlobName}");
+                _logger.LogInformation($"Saving mapped cost data for subscription {tracker.SubscriptionId} to {tracker.CostDataBlobName}");
                 containerName = containerName.ToLower();
                 BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
                 containerClient.CreateIfNotExists();
 
-                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.DestinationBlobName);
+                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.CostDataBlobName);
 
 
                 var sb = new StringBuilder();
@@ -385,25 +393,54 @@ namespace AzureBillingV2
 
                 if (writeOperation.GetRawResponse().Status < 300)
                 {
-                    tracker.DestinationBlobName = targetClient.Uri.ToString();
-                    tracker.StatusMessage = "Successfully saved report to Blob storage";
+                    tracker.CostDataBlobName = targetClient.Uri.ToString();
+                    tracker.StatusMessage = "Successfully saved report to Blob storage. ";
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.DestinationBlobName}': {writeOperation.GetRawResponse().ReasonPhrase}";
+                    tracker.StatusMessage = $"Failed to copy target blob file '{tracker.CostDataBlobName}': {writeOperation.GetRawResponse().ReasonPhrase}";
                     _logger.LogError(tracker.StatusMessage);
                 }
-
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.DestinationBlobName} -- {exe.Message}";
+                tracker.StatusMessage = $"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}";
                 _logger.LogError(exe, tracker.StatusMessage);
             }
             tracker.Success = false;
             return tracker;
 
+        }
+
+        public async Task<ReportTracking> SaveRateCardToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
+        {
+
+            try
+            {
+                _logger.LogInformation($"Saving rate card data for subscription {tracker.SubscriptionId} to {tracker.RateCardBlobName}");
+                var rateCard = JsonSerializer.Serialize<RateCardData>(tracker.RateCard, new JsonSerializerOptions() { WriteIndented = true});
+                BlobClient rateCardClient = new BlobClient(targetConnectionString, containerName, tracker.RateCardBlobName);
+                var rateCardClientWrite = await rateCardClient.UploadAsync(BinaryData.FromString(rateCard), true);
+                if (rateCardClientWrite.GetRawResponse().Status < 300)
+                {
+                    tracker.RateCardBlobName = rateCardClient.Uri.ToString();
+                    tracker.StatusMessage += "Successfully saved rate card to Blob storage. ";
+                    return tracker;
+                }
+                else
+                {
+                    tracker.StatusMessage = $"Failed to copy rate card blob file '{tracker.RateCardBlobName}': {rateCardClientWrite.GetRawResponse().ReasonPhrase}";
+                    _logger.LogError(tracker.StatusMessage);
+                }
+            }
+            catch (Exception rateExe)
+            {
+                tracker.StatusMessage = $"Failed to copy rate card blob file: {tracker.RateCardBlobName} -- {rateExe.Message}";
+                _logger.LogError(rateExe, tracker.StatusMessage);
+            }
+            tracker.Success = false;
+            return tracker;
         }
 
         #endregion
