@@ -20,6 +20,7 @@ var builder = new HostBuilder()
     .ConfigureServices(services =>
     {
         services.AddSingleton<AzureBillingV2.Apis>();
+        services.AddSingleton<AzureBillingV2.Orchestration>();
         services.AddSingleton<IConfigurationRoot>(config);
     });
 

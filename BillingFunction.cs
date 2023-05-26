@@ -17,12 +17,14 @@ namespace AzureBillingV2
         private readonly ILogger _logger;
         private IConfiguration config;
         private Apis apis;
+        private Orchestration orchestration;
 
-        public BillingFunction(ILoggerFactory loggerFactory, IConfiguration config, Apis apis)
+        public BillingFunction(ILoggerFactory loggerFactory, IConfiguration config, Apis apis, Orchestration orchestration)
         {
             _logger = loggerFactory.CreateLogger<BillingFunction>();
             this.config = config;
             this.apis = apis;
+            this.orchestration = orchestration;
         }
 
         [Function("BillingFunction")]
@@ -30,9 +32,11 @@ namespace AzureBillingV2
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
+            var stepFailedReports = new List<ReportTracking>();
             var finalResults = new FinalResults();
            
 
+            //Set Values from App Settings
             var managementGroupId = config["ManagementGroupId"];
             var tenantId = config["TenantId"];
             bool useLegacyRateCard;
@@ -42,9 +46,13 @@ namespace AzureBillingV2
             {
                 saveRateCardData = true;
             }
-
-            finalResults.ManagementGroupId = managementGroupId;
-
+            bool saveRawBillingReport;
+            if (!bool.TryParse(config["SaveRawBillingReport"], out saveRawBillingReport))
+            {
+                saveRawBillingReport = true;
+            }
+            var containerName = config["ContainerName"];
+            var targetConnectionString = config["StorageConnectionString"];
 
             //Set the start and end dates for the reports
             var start = req.Query["startDate"];
@@ -61,9 +69,11 @@ namespace AzureBillingV2
            
             _logger.LogInformation($"Running Cost Management Report -- startDate: {startDate}, endDate: {endDateTime}");
             var startDateTime = startDate.ToDateTime(new TimeOnly(0, 0));
+            
+            //Set basic informtaion for final results 
             finalResults.StartDate = startDateTime;
             finalResults.EndDate = endDateTime;
-            
+            finalResults.ManagementGroupId = managementGroupId;
 
             // Get list of subscriptions
             (var subs, var failMsg) = await apis.GetListOfSubscriptions(managementGroupId, tenantId);
@@ -73,113 +83,42 @@ namespace AzureBillingV2
                 finalResults.HasFailures = true;
                 finalResults.FailureMessage = failMsg;
             }
-            
 
-            // Generate cost details report for each subscription
-            List<Task<ReportTracking>> generateTasks = new List<Task<ReportTracking>>();
-            foreach(var sub in subs)
-            {
-                generateTasks.Add(apis.RequestCostDetailsReport(sub, startDateTime, endDateTime));
-            }
-            var generateResults = await Task.WhenAll(generateTasks.ToArray());
+            (successfulReports, stepFailedReports) = await orchestration.GenerateCostDetailsReports(subs, startDateTime, endDateTime);
+            failedReports.AddRange(stepFailedReports);
 
-            //Update lists of success and failed.
-            successfulReports = generateResults.Where(t => !string.IsNullOrEmpty(t.ReportStatusUrl)).ToList();
-            failedReports.AddRange(generateResults.Where(t => !t.Success));
-            
-            _logger.LogInformation($"Found {successfulReports.Count()} successful generation tasks");
-
-            // Get list of report URIs
-            _logger.LogInformation($"Checking report status and getting report Sas URLs");
-            List<Task<ReportTracking>> reportTasks = new List<Task<ReportTracking>>();
-            foreach(var task in successfulReports)
-            {
-                reportTasks.Add(apis.GetReportStatusBlobUrl(task,tenantId));
-            }
-            var reportResults = await Task.WhenAll(reportTasks.ToArray());
-
-            //Update lists of success and failed.
-            successfulReports = reportResults.Where(t => t.Success).ToList();
-            failedReports.AddRange(reportResults.Where(t => !t.Success));
-            _logger.LogInformation($"Found {successfulReports.Count()} successful reports");
-
-            var containerName = config["ContainerName"];
-            var targetConnectionString = config["StorageConnectionString"];
+            (successfulReports, stepFailedReports) = await orchestration.GetReportsStatusAndBlobUrls(successfulReports);
+            failedReports.AddRange(stepFailedReports);
 
             if (useLegacyRateCard)
             {
-                _logger.LogInformation($"Getting Legacy Rate Card information for {successfulReports.Count()} subscriptions");
-                var rateCardTasks = new List<Task<ReportTracking>>();
-                foreach (var tracker in successfulReports)
-                {
-                    rateCardTasks.Add(apis.GetRateCardInformation(tracker, tenantId));
-                }
-                var rateCardResults = await Task.WhenAll(rateCardTasks.ToArray());
-                //Update lists of success and failed.
-                successfulReports = rateCardResults.Where(t => t.Success).ToList();
-                failedReports.AddRange(rateCardResults.Where(t => !t.Success));
 
-                _logger.LogInformation($"Mapping Legacy Rate Card information to billing data for {successfulReports.Count()} subscriptions");
-                var mappingTasks = new List<Task<ReportTracking>>();
-                foreach (var tracker in successfulReports)
-                {
-                    mappingTasks.Add(apis.MapRateCardToCostReport(tracker));
-                }
-                var mappingResults = await Task.WhenAll(mappingTasks.ToArray());
-                //Update lists of success and failed.
-                successfulReports = mappingResults.Where(t => t.Success).ToList();
-                failedReports.AddRange(rateCardResults.Where(t => !t.Success));
+                (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports);
+                failedReports.AddRange(stepFailedReports);
 
+                (successfulReports, stepFailedReports) = await orchestration.MapRateCardsToCostReports(successfulReports);
+                failedReports.AddRange(stepFailedReports);
 
-                _logger.LogInformation($"Saving mapped billing data for {successfulReports.Count()} subscriptions");
-                var writeTasks = new List<Task<ReportTracking>>();
-                foreach (var tracker in successfulReports)
-                {
-                    tracker.DestinationBlobName = $"{startDate.ToString("yyyy-MM-dd")}/Billing-{tracker.SubscriptionId}.csv";
-              
-                    writeTasks.Add(apis.SaveMappedDataToStorage(tracker,containerName, targetConnectionString));
-                }
-                var writeResults = await Task.WhenAll(writeTasks.ToArray());
-                //Update lists of success and failed.
-                successfulReports = mappingResults.Where(t => t.Success).ToList();
-                failedReports.AddRange(rateCardResults.Where(t => !t.Success));
-
+                (successfulReports, stepFailedReports) = await orchestration.SaveMappedReportsToStorage(successfulReports, "Billing", startDate,containerName, targetConnectionString);
+                failedReports.AddRange(stepFailedReports);
 
                 if (saveRateCardData)
                 {
-                    _logger.LogInformation($"Saving rate card data for {successfulReports.Count()} subscriptions");
-                    var rateCardBlobTasks = new List<Task<ReportTracking>>();
-                    foreach (var tracker in successfulReports)
-                    {
-                        tracker.RateCardBlobName = $"{startDate.ToString("yyyy-MM-dd")}/RateCard-{tracker.SubscriptionId}.json";
-                        rateCardBlobTasks.Add(apis.SaveRateCardToStorage(tracker, containerName, targetConnectionString));
-                    }
-                    var rateCardBlobResults = await Task.WhenAll(rateCardBlobTasks.ToArray());
-                    //Update lists of success and failed.
-                    successfulReports = rateCardBlobResults.Where(t => t.Success).ToList();
-                    failedReports.AddRange(rateCardBlobResults.Where(t => !t.Success));
+                    (successfulReports, stepFailedReports) = await orchestration.SaveSubscriptionsRateCardData(successfulReports, startDate, containerName, targetConnectionString);
+                    failedReports.AddRange(stepFailedReports);
+                }
+
+                if(saveRawBillingReport)
+                {
+                    (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Raw", startDate, containerName, targetConnectionString);
+                    failedReports.AddRange(stepFailedReports);
                 }
 
             }
             else
             {
-
-
-                // Copy Reports to Blob Storage
-                _logger.LogInformation($"Copying {successfulReports.Count()} reports to destination Blob Container");
-                var blobCopyTasks = new List<Task<ReportTracking>>();
-                foreach (var tracker in successfulReports)
-                {
-                    tracker.DestinationBlobName = $"{startDate.ToString("yyyy-MM-dd")}/Billing-{tracker.SubscriptionId}.csv";
-                    blobCopyTasks.Add(apis.SaveBlobToStorage(tracker, containerName, targetConnectionString));
-                }
-                var blobCopyResults = await Task.WhenAll(blobCopyTasks.ToArray());
-                _logger.LogInformation($"Copied {blobCopyResults.Count()} reports to blob storage");
-
-                //Update lists of success and failed.
-                successfulReports = blobCopyResults.Where(t => t.Success).ToList();
-                failedReports.AddRange(blobCopyResults.Where(t => !t.Success));
-                _logger.LogInformation($"Successfully copied {successfulReports.Count()} reports to destination Blob Container");
+                (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Billing", startDate, containerName, targetConnectionString);
+                failedReports.AddRange(stepFailedReports);
             }
 
             

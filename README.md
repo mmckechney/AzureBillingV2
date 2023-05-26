@@ -45,6 +45,9 @@ The HTTP request will return a JSON summary of the report generation as per the 
   - `ManagementGroupId` - the value need to be the Guid Id value of the mangement group
   - `StorageConnectionString` - connection string to the Azure storage account
   - `ContainerName` - name of the storage container to save the billing report CSV. If is does not exist, it will be created at runtime. The name must adhere to the [naming rules](https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names).
-  - If you need to leverage the [Legacy RateCard APIs](https://learn.microsoft.com/en-us/previous-versions/azure/reference/mt219004(v%3dazure.100)), you can add a configuration setting `UseLegacyRateCard` with the value `true`
+  - If you need to leverage the [Legacy RateCard APIs](https://learn.microsoft.com/en-us/previous-versions/azure/reference/mt219004(v%3dazure.100)), you can add a configuration setting `UseLegacyRateCard` with the value `true` (default: `false`)
+    - Additional configuraiton options when using legacy rate card:
+      - `SaveRateCardData` - whether or not to save the Rate Card json file to storage (default: `true`)
+      - `SaveRawBillingReport` - whether or not to save raw CSV file (no mapped cost data) to storage (default: `true`)
 
 **NOTE:** If you have a large number of subscriptions in your management group, you may need to deploy the Function to something other than the "Consumption" tier. This is because the Consumption tier will timeout after 5 minutes.

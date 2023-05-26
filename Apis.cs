@@ -221,7 +221,7 @@ namespace AzureBillingV2
                 if (result.GetRawResponse().Status < 300)
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
-                    tracker.StatusMessage = "Successfully saved report to Blob storage";
+                    tracker.StatusMessage += "Successfully saved report to Blob storage. ";
                     return tracker;
                 }
                 else
@@ -260,6 +260,13 @@ namespace AzureBillingV2
                     if (mgSubscriptions.Count == 0)
                     {
                         return (mgSubscriptions, $"No subscriptions found for Management Group {managementGroupId}");
+                    }
+                    else
+                    {
+                        mgSubscriptions.ForEach(s =>
+                        {
+                            s.TenantId = tenantId;
+                        });
                     }
                     return (mgSubscriptions, string.Empty);
                 }
@@ -394,7 +401,7 @@ namespace AzureBillingV2
                 if (writeOperation.GetRawResponse().Status < 300)
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
-                    tracker.StatusMessage = "Successfully saved report to Blob storage. ";
+                    tracker.StatusMessage += "Successfully saved rate card mapped report to Blob storage. ";
                     return tracker;
                 }
                 else
