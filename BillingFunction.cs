@@ -97,8 +97,15 @@ namespace AzureBillingV2
                 (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports);
                 failedReports.AddRange(stepFailedReports);
 
+               
                 (successfulReports, stepFailedReports) = await orchestration.MapRateCardsToCostReports(successfulReports);
                 failedReports.AddRange(stepFailedReports);
+
+                if (saveRawBillingReport)
+                {
+                    (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Raw", startDate, containerName, targetConnectionString);
+                    failedReports.AddRange(stepFailedReports);
+                }
 
                 (successfulReports, stepFailedReports) = await orchestration.SaveMappedReportsToStorage(successfulReports, "Billing", startDate,containerName, targetConnectionString);
                 failedReports.AddRange(stepFailedReports);
@@ -109,11 +116,7 @@ namespace AzureBillingV2
                     failedReports.AddRange(stepFailedReports);
                 }
 
-                if(saveRawBillingReport)
-                {
-                    (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Raw", startDate, containerName, targetConnectionString);
-                    failedReports.AddRange(stepFailedReports);
-                }
+              
             }
             else
             {
