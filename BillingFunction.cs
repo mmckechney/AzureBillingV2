@@ -54,6 +54,7 @@ namespace AzureBillingV2
             var containerName = config["ContainerName"];
             var targetConnectionString = config["StorageConnectionString"];
 
+
             //Set the start and end dates for the reports
             var start = req.Query["startDate"];
             DateTime endDateTime;
@@ -113,7 +114,6 @@ namespace AzureBillingV2
                     (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Raw", startDate, containerName, targetConnectionString);
                     failedReports.AddRange(stepFailedReports);
                 }
-
             }
             else
             {

@@ -222,6 +222,7 @@ namespace AzureBillingV2
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
                     tracker.StatusMessage += "Successfully saved report to Blob storage. ";
+
                     return tracker;
                 }
                 else
@@ -402,6 +403,7 @@ namespace AzureBillingV2
                 {
                     tracker.CostDataBlobName = targetClient.Uri.ToString();
                     tracker.StatusMessage += "Successfully saved rate card mapped report to Blob storage. ";
+
                     return tracker;
                 }
                 else
