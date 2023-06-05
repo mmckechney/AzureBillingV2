@@ -265,3 +265,7 @@ __pycache__/
 
 __azurite*
 __blobstorage__/
+/Properties/PublishProfiles
+/Properties/ServiceDependencies/azurebillingv2 - Zip Deploy
+/Properties/serviceDependencies.json
+/Properties/serviceDependencies.azurebillingv2 - Zip Deploy.json

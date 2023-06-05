@@ -257,7 +257,7 @@ namespace AzureBillingV2
                 {
                     var contentString = await result.Content.ReadAsStringAsync();
                     var mg = JsonSerializer.Deserialize<ManagementGroupData>(contentString);
-                    var mgSubscriptions = mg.Value.Where(v => v.Type == "/subscriptions").Select(s => new ReportTracking() { SubscriptionId = s.Name, SubscriptionName = s.Properties.DisplayName }).ToList();
+                    var mgSubscriptions = mg.Value.Where(v => v.Type == "/subscriptions").Select(s => new ReportTracking() { SubscriptionId = s.Name, SubscriptionName = s.Properties.DisplayName, TenantId = s.Properties.TenantId }).ToList();
                     if (mgSubscriptions.Count == 0)
                     {
                         return (mgSubscriptions, $"No subscriptions found for Management Group {managementGroupId}");
