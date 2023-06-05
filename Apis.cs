@@ -337,7 +337,7 @@ namespace AzureBillingV2
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(apiUrl);
                 statusCode = (int)result.StatusCode;
-                if (result.IsSuccessStatusCode || statusCode < 400)
+                if (result.IsSuccessStatusCode)
                 {
                     var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
                     return rateData;
@@ -346,6 +346,7 @@ namespace AzureBillingV2
                 {
                     if(result.Headers.Location != null)
                     {
+                        _logger.LogInformation($"Get Rate Card for {subscriptionId} returned a {statusCode} return code. Redirecting to Locaton header URL: {result.Headers.Location.ToString()}");
                         apiUrl = result.Headers.Location.ToString();
                         return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration, apiUrl);
                     }
