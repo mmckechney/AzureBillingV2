@@ -351,7 +351,6 @@ namespace AzureBillingV2
                 var result = await httpClient.GetAsync(apiUrl);
                 statusCode = (int)result.StatusCode;
                 reasonPhrase = result.ReasonPhrase;
-
                 if (result.IsSuccessStatusCode)
                 {
                     var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
