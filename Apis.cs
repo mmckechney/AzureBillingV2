@@ -323,17 +323,32 @@ namespace AzureBillingV2
             return tracker;
 
         }
-        public async Task<RateCardData> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US")
+        public async Task<RateCardData> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US", int iteration = 0, string redirectUrl = "")
         {
+            var statusCode = 0;
+            string apiUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq '{offerDurableId}' and Currency eq '{currency}' and Locale eq '{locale}' and RegionInfo eq '{regionInfo}'";
             try
             {
-                var apiUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq '{offerDurableId}' and Currency eq '{currency}' and Locale eq '{locale}' and RegionInfo eq '{regionInfo}'";
+                iteration = iteration + 1;
+                if (!string.IsNullOrEmpty(redirectUrl))
+                {
+                    apiUrl = redirectUrl;
+                }
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(apiUrl);
-                if (result.IsSuccessStatusCode)
+                statusCode = (int)result.StatusCode;
+                if (result.IsSuccessStatusCode || statusCode < 400)
                 {
                     var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
                     return rateData;
+                }
+                else if(statusCode < 400)
+                {
+                    if(result.Headers.Location != null)
+                    {
+                        apiUrl = result.Headers.Location.ToString();
+                        return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration, apiUrl);
+                    }
                 }
                 else
                 {
@@ -342,7 +357,13 @@ namespace AzureBillingV2
             }
             catch (Exception exe)
             {
-                _logger.LogError(exe, $"Unable to get rate card information for subscription {subscriptionId}");
+                _logger.LogError(exe, $"Unable to get rate card information for subscription {subscriptionId}. Return status code is: {statusCode}");
+                if (statusCode < 400 && iteration < 3)
+                {
+                    _logger.LogInformation($"Retrying rate card information for subscription {subscriptionId}. Iteration {iteration}");
+                    await Task.Delay(5000);
+                    return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration);
+                }
             }
             return null;
         }
