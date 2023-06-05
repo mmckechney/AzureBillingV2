@@ -19,10 +19,10 @@ namespace AzureBilling.Test
             _config = ServiceProvider.GetRequiredService<IConfiguration>() ?? throw new ArgumentNullException(nameof(IConfiguration));
         }
         [DataTestMethod]
-        [DataRow("0d901325-d643-4db7-ae90-58b4e3834629", "16b3c013-d300-468d-ac64-7eda0820b6d3")]
-        public async Task GetRateCard_Test(string subscriptionId, string tenantId)
+        [DataRow("0d901325-d643-4db7-ae90-58b4e3834629", "16b3c013-d300-468d-ac64-7eda0820b6d3", "MS-AZR-0003P")]
+        public async Task GetRateCard_Test(string subscriptionId, string tenantId, string offerDurableId)
         {
-            var rateCard = await _apis.GetRateCardInformation(subscriptionId, tenantId);
+            var rateCard = await _apis.GetRateCardInformation(subscriptionId, tenantId, offerDurableId);
             Assert.IsNotNull(rateCard);
         }
 
@@ -77,7 +77,7 @@ namespace AzureBilling.Test
             foreach(var record in costReport)
             {
 
-                var rate = rateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
                 if(rate != null)
                 {
                     var reportCost = record.costInUsd;
@@ -110,7 +110,7 @@ namespace AzureBilling.Test
             foreach (var record in costReport)
             {
 
-                var rate = rateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
                 if (rate != null)
                 {
                     var reportCost = record.costInUsd;

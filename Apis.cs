@@ -248,8 +248,6 @@ namespace AzureBillingV2
             string failureMessage = "";
             try
             {
-
-
                 var url = $"https://management.azure.com/providers/Microsoft.Management/getEntities?api-version=2020-05-01&%24filter=name%20eq%20%27{managementGroupId}%27";
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.PostAsync(url, null);
@@ -257,7 +255,13 @@ namespace AzureBillingV2
                 {
                     var contentString = await result.Content.ReadAsStringAsync();
                     var mg = JsonSerializer.Deserialize<ManagementGroupData>(contentString);
-                    var mgSubscriptions = mg.Value.Where(v => v.Type == "/subscriptions").Select(s => new ReportTracking() { SubscriptionId = s.Name, SubscriptionName = s.Properties.DisplayName }).ToList();
+                    var mgSubscriptions = mg.Value.Where(v => v.Type == "/subscriptions").Select(s => new ReportTracking()
+                    {
+                        SubscriptionId = s.Name,
+                        SubscriptionName = s.Properties.DisplayName,
+                        TenantId = s.Properties.TenantId,
+                        
+                    }).ToList();
                     if (mgSubscriptions.Count == 0)
                     {
                         return (mgSubscriptions, $"No subscriptions found for Management Group {managementGroupId}");
@@ -318,15 +322,24 @@ namespace AzureBillingV2
         public async Task<ReportTracking> GetRateCardInformation(ReportTracking tracker, string tenantId = "")
         {
             _logger.LogInformation($"Getting rate card information for subscription {tracker.SubscriptionId}");
-            var rateCard = await GetRateCardInformation(tracker.SubscriptionId, tenantId);
-            tracker.RateCard = rateCard;
+            var result = await GetRateCardInformation(tracker.SubscriptionId, tenantId, tracker.OfferDurableId);
+            tracker.RateCard = result.Item1;
+            tracker.RateCardUrl = result.Item2;
+            if(tracker.RateCard == null)
+            {
+                tracker.Success = false;
+                tracker.StatusMessage.Add(result.Item3);
+            }
             return tracker;
 
         }
-        public async Task<RateCardData> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US", int iteration = 0, string redirectUrl = "")
+        public async Task<(RateCardData, string, string)> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US", int iteration = 0, string redirectUrl = "")
         {
             var statusCode = 0;
+            var reasonPhrase = "";
+            var failureMessage = "";
             string apiUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq '{offerDurableId}' and Currency eq '{currency}' and Locale eq '{locale}' and RegionInfo eq '{regionInfo}'";
+           
             try
             {
                 iteration = iteration + 1;
@@ -337,10 +350,11 @@ namespace AzureBillingV2
                 httpClient.DefaultRequestHeaders.Authorization = await GetAuthHeader(tenantId);
                 var result = await httpClient.GetAsync(apiUrl);
                 statusCode = (int)result.StatusCode;
+                reasonPhrase = result.ReasonPhrase;
                 if (result.IsSuccessStatusCode)
                 {
                     var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
-                    return rateData;
+                    return (rateData, apiUrl, "");
                 }
                 else if(statusCode < 400)
                 {
@@ -352,11 +366,14 @@ namespace AzureBillingV2
                     }
                     else
                     {
-                        _logger.LogError($"Get Rate Card for {subscriptionId} returned a {statusCode} return code, but no Location Header found . {result.ReasonPhrase}");
+                        failureMessage = $"Get Rate Card for {subscriptionId} returned a {statusCode} return code, but no Location Header found . {result.ReasonPhrase}";
+                        _logger.LogError(failureMessage);
                     }
                 }
                 else
                 {
+                    string content = await result.Content.ReadAsStringAsync();
+                    failureMessage = content;
                     _logger.LogError($"Unable to get rate card information for subscription {subscriptionId}. {result.ReasonPhrase}");
                 }
             }
@@ -370,7 +387,8 @@ namespace AzureBillingV2
                     return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration);
                 }
             }
-            return null;
+
+            return (null, apiUrl,  $"Failed to get Legacy Rate Card for {subscriptionId}. Return status code is: {statusCode} ({reasonPhrase}). {failureMessage}");
         }
 
         public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker)

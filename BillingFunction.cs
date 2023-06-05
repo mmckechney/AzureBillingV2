@@ -54,6 +54,11 @@ namespace AzureBillingV2
             var containerName = config["ContainerName"];
             var targetConnectionString = config["StorageConnectionString"];
 
+            var offerDurableId = "MS-AZR-0003P";
+            if (!string.IsNullOrWhiteSpace(config["OfferDurableId"]))
+            {
+                offerDurableId = config["OfferDurableId"];
+            }
 
             //Set the start and end dates for the reports
             var start = req.Query["startDate"];
@@ -94,7 +99,7 @@ namespace AzureBillingV2
             if (useLegacyRateCard)
             {
 
-                (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports);
+                (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports, offerDurableId);
                 failedReports.AddRange(stepFailedReports);
 
                
