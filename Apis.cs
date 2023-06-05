@@ -349,6 +349,10 @@ namespace AzureBillingV2
                         apiUrl = result.Headers.Location.ToString();
                         return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration, apiUrl);
                     }
+                    else
+                    {
+                        _logger.LogError($"Get Rate Card for {subscriptionId} returned a {statusCode} return code, but no Location Header found . {result.ReasonPhrase}");
+                    }
                 }
                 else
                 {
