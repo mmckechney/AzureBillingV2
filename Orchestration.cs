@@ -64,7 +64,7 @@ namespace AzureBillingV2
             return (successfulReports, failedReports);
         }
 
-        internal async Task<(List<ReportTracking>,List<ReportTracking>)> GetLegacyRateCardsForSubs(List<ReportTracking> reports)
+        internal async Task<(List<ReportTracking>,List<ReportTracking>)> GetLegacyRateCardsForSubs(List<ReportTracking> reports, string offerDurableId)
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
@@ -73,6 +73,7 @@ namespace AzureBillingV2
             var rateCardTasks = new List<Task<ReportTracking>>();
             foreach (var tracker in reports)
             {
+                tracker.OfferDurableId = offerDurableId;
                 rateCardTasks.Add(apis.GetRateCardInformation(tracker, tracker.TenantId));
             }
             var rateCardResults = await Task.WhenAll(rateCardTasks.ToArray());
