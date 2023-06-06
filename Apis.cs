@@ -30,11 +30,18 @@ namespace AzureBillingV2
         private HttpClient httpClient;
         private IConfiguration config;
         private Random randomGen = new Random();
+        private int maxConcurrency = 2;
+        private static SemaphoreSlim semaphore;
         public Apis(ILoggerFactory loggerFactory, IConfiguration config)
         {
             this._logger = loggerFactory.CreateLogger<Apis>();
             this.httpClient = new HttpClient();
             this.config = config;
+            if (int.TryParse(config["MaxConcurrency"], out int max))
+            {
+                maxConcurrency = max;
+            }
+            semaphore = new SemaphoreSlim(1,maxConcurrency);
         }
 
         const string generateCostDetails = "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.CostManagement/generateCostDetailsReport?api-version=2022-10-01";
@@ -89,6 +96,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> RequestCostDetailsReport(ReportTracking tracker, DateTime start, DateTime end, string tenantId = "", int iteration = 0)
         {
+            semaphore.Wait();
             try
             {
                 _logger.LogInformation($"Requesting cost report for subscription {tracker.SubscriptionId}");
@@ -150,6 +158,10 @@ namespace AzureBillingV2
                 tracker.StatusMessage.Add($"Failed to request cost report generation for subscription: {tracker.SubscriptionId} -- {exe.Message}");
                 _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
+            finally
+            {
+                semaphore.Release();
+            }
             tracker.Success = false;
             return tracker;
         }
@@ -159,6 +171,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> GetReportStatusBlobUrl(ReportTracking tracker, string tenantId = "", int iteration = 0)
         {
+            semaphore.Wait();
             try
             {
                 iteration = iteration + 1;
@@ -201,12 +214,17 @@ namespace AzureBillingV2
                     _logger.LogError(exe, tracker.StatusMessage.ToLines());
                 }
             }
+            finally
+            {
+                semaphore.Release();
+            }
             tracker.Success = false;
             return tracker;
         }
 
         public async Task<ReportTracking> SaveBlobToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
         {
+            semaphore.Wait();
             try
             {
                 _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {tracker.CostDataBlobName}");
@@ -236,6 +254,10 @@ namespace AzureBillingV2
                 tracker.StatusMessage.Add($"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}");
                 _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
+            finally
+            {
+                semaphore.Release();
+            }
             tracker.Success = false;
             return tracker;
 
@@ -245,6 +267,7 @@ namespace AzureBillingV2
 
         public async Task<(List<ReportTracking>, string)> GetListOfSubscriptions(string managementGroupId, string tenantId = "")
         {
+            semaphore.Wait();
             string failureMessage = "";
             try
             {
@@ -286,6 +309,10 @@ namespace AzureBillingV2
                 failureMessage = $"Failed to get list of subscriptions for management group: {managementGroupId} -- {exe.Message}";
                 _logger.LogError(exe, failureMessage);
             }
+            finally
+            {
+                semaphore.Release();
+            }
             return (new List<ReportTracking>(), failureMessage);
         }
 
@@ -304,18 +331,19 @@ namespace AzureBillingV2
                 using (var sr = new StringReader(csvContent))
                 {
 
-                    var csv = new CsvReader(sr,new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null});
+                    var csv = new CsvReader(sr, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null });
                     //csv.Context.RegisterClassMap<BillingData>();
                     billData = csv.GetRecords<BillingData>().ToList();
                 }
 
                 return billData;
             }
-            catch(Exception exe)
+            catch (Exception exe)
             {
                 _logger.LogError(exe, $"Unable to read file at {blobSasUrl}");
                 return null;
             }
+
         }
 
 
@@ -335,11 +363,12 @@ namespace AzureBillingV2
         }
         public async Task<(RateCardData, string, string)> GetRateCardInformation(string subscriptionId, string tenantId = "", string offerDurableId = "MS-AZR-0003P", string currency = "USD", string locale = "en-US", string regionInfo = "US", int iteration = 0, string redirectUrl = "")
         {
+            semaphore.Wait();
             var statusCode = 0;
             var reasonPhrase = "";
             var failureMessage = "";
             string apiUrl = $"https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq '{offerDurableId}' and Currency eq '{currency}' and Locale eq '{locale}' and RegionInfo eq '{regionInfo}'";
-           
+
             try
             {
                 iteration = iteration + 1;
@@ -356,9 +385,9 @@ namespace AzureBillingV2
                     var rateData = await result.Content.ReadFromJsonAsync<RateCardData>();
                     return (rateData, apiUrl, "");
                 }
-                else if(statusCode < 400)
+                else if (statusCode < 400)
                 {
-                    if(result.Headers.Location != null)
+                    if (result.Headers.Location != null)
                     {
                         _logger.LogInformation($"Get Rate Card for {subscriptionId} returned a {statusCode} return code. Redirecting to Locaton header URL: {result.Headers.Location.ToString()}");
                         apiUrl = result.Headers.Location.ToString();
@@ -387,34 +416,47 @@ namespace AzureBillingV2
                     return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration);
                 }
             }
+            finally
+            {
+                semaphore.Release();
+            }
 
             return (null, apiUrl,  $"Failed to get Legacy Rate Card for {subscriptionId}. Return status code is: {statusCode} ({reasonPhrase}). {failureMessage}");
         }
 
-        public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker)
+        public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker, RateCardData? rateCard = null)
         {
-            _logger.LogInformation($"Mapping rate card to cost report for subscription {tracker.SubscriptionId}");
-            var costReport = await GetReportCSVContents(tracker.ReportBlobSas);
-            
-            foreach (var record in costReport)
+            semaphore.Wait();
+            List<BillingData> costReport = null;
+            try
             {
-                try
-                {
-                    var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
-                    if (rate != null)
-                    {
-                        var reportCost = record.costInUsd;
-                        var calcCost = rate.MeterRates.BaseRate * record.quantity;
-                        record.costInUsd = calcCost;
-                        record.costInBillingCurrency = calcCost;    
-                    }
-                }
-                catch (Exception exe)
-                {
-                    _logger.LogWarning($"Unable to map rate card to cost report for meterid {record.meterId}. {exe.Message}");
-                }
-                
+                _logger.LogInformation($"Mapping rate card to cost report for subscription {tracker.SubscriptionId}");
+                costReport = await GetReportCSVContents(tracker.ReportBlobSas);
 
+                foreach (var record in costReport)
+                {
+                    try
+                    {
+                        var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                        if (rate != null)
+                        {
+                            var reportCost = record.costInUsd;
+                            var calcCost = rate.MeterRates.BaseRate * record.quantity;
+                            record.costInUsd = calcCost;
+                            record.costInBillingCurrency = calcCost;
+                        }
+                    }
+                    catch (Exception exe)
+                    {
+                        _logger.LogWarning($"Unable to map rate card to cost report for meterid {record.meterId}. {exe.Message}");
+                    }
+
+
+                }
+            }
+            finally
+            {
+                semaphore.Release();
             }
             tracker.CostInfo = costReport;
             return tracker;
@@ -422,6 +464,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> SaveMappedDataToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
         {
+            semaphore.Wait();
             try
             {
                 _logger.LogInformation($"Saving mapped cost data for subscription {tracker.SubscriptionId} to {tracker.CostDataBlobName}");
@@ -461,6 +504,10 @@ namespace AzureBillingV2
                 tracker.StatusMessage.Add($"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}");
                 _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
+            finally
+            {
+                semaphore.Release();
+            }
             tracker.Success = false;
             return tracker;
 
@@ -468,7 +515,7 @@ namespace AzureBillingV2
 
         public async Task<ReportTracking> SaveRateCardToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
         {
-
+            semaphore.Wait();
             try
             {
                 _logger.LogInformation($"Saving rate card data for subscription {tracker.SubscriptionId} to {tracker.RateCardBlobName}");
@@ -491,6 +538,10 @@ namespace AzureBillingV2
             {
                 tracker.StatusMessage.Add($"Failed to copy rate card blob file: {tracker.RateCardBlobName} -- {rateExe.Message}");
                 _logger.LogError(rateExe, tracker.StatusMessage.ToLines());
+            }
+            finally
+            {
+                semaphore.Release();
             }
             tracker.Success = false;
             return tracker;

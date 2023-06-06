@@ -60,6 +60,9 @@ namespace AzureBillingV2
                 offerDurableId = config["OfferDurableId"];
             }
 
+            bool rateCardPerSubscription = false;
+            bool.TryParse(config["RateCardPerSubscription"], out rateCardPerSubscription);
+
             //Set the start and end dates for the reports
             var start = req.Query["startDate"];
             DateTime endDateTime;
@@ -99,7 +102,7 @@ namespace AzureBillingV2
             if (useLegacyRateCard)
             {
 
-                (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports, offerDurableId);
+                (successfulReports, stepFailedReports) = await orchestration.GetLegacyRateCardsForSubs(successfulReports, offerDurableId, rateCardPerSubscription);
                 failedReports.AddRange(stepFailedReports);
 
                

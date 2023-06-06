@@ -64,25 +64,50 @@ namespace AzureBillingV2
             return (successfulReports, failedReports);
         }
 
-        internal async Task<(List<ReportTracking>,List<ReportTracking>)> GetLegacyRateCardsForSubs(List<ReportTracking> reports, string offerDurableId)
+        internal async Task<(List<ReportTracking>,List<ReportTracking>)> GetLegacyRateCardsForSubs(List<ReportTracking> reports, string offerDurableId, bool rateCardPerSubscription)
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
-
-            _logger.LogInformation($"Getting Legacy Rate Card information for {reports.Count()} subscriptions");
-            var rateCardTasks = new List<Task<ReportTracking>>();
-            foreach (var tracker in reports)
+            if (rateCardPerSubscription)
             {
-                tracker.OfferDurableId = offerDurableId;
-                rateCardTasks.Add(apis.GetRateCardInformation(tracker, tracker.TenantId));
-            }
-            var rateCardResults = await Task.WhenAll(rateCardTasks.ToArray());
-            //Update lists of success and failed.
-            successfulReports = rateCardResults.Where(t => t.Success).ToList();
-            failedReports.AddRange(rateCardResults.Where(t => !t.Success));
+                _logger.LogInformation($"Getting Legacy Rate Card information for {reports.Count()} subscriptions");
+                var rateCardTasks = new List<Task<ReportTracking>>();
+                foreach (var tracker in reports)
+                {
+                    tracker.OfferDurableId = offerDurableId;
+                    rateCardTasks.Add(apis.GetRateCardInformation(tracker, tracker.TenantId));
+                }
+                var rateCardResults = await Task.WhenAll(rateCardTasks.ToArray());
+                //Update lists of success and failed.
+                successfulReports = rateCardResults.Where(t => t.Success).ToList();
+                failedReports.AddRange(rateCardResults.Where(t => !t.Success));
 
-            _logger.LogInformation($"Retrieved Legacy Rate Card information for {successfulReports.Count()} subscriptions");
-            return (successfulReports, failedReports);
+                _logger.LogInformation($"Retrieved Legacy Rate Card information for {successfulReports.Count()} subscriptions");
+                return (successfulReports, failedReports);
+            }
+            else
+            {
+                var tracker = reports.First();
+                tracker.OfferDurableId = offerDurableId;
+                _logger.LogInformation($"RateCardPerSubscription is set to `false`. Retrieving Legacy Rate Card information for {tracker.TenantId} which will be used for all subscriptions");
+                tracker = await apis.GetRateCardInformation(tracker, tracker.TenantId);
+                if (tracker.Success)
+                {
+                    foreach (var t in reports)
+                    {
+                        if (t.SubscriptionId != tracker.SubscriptionId)
+                        {
+                            t.OfferDurableId = offerDurableId;
+                            t.RateCardUrl = tracker.RateCardUrl;
+                        }
+                    }
+                    return (reports, failedReports);
+                }
+                else
+                {
+                    return (successfulReports, reports);
+                }
+            }
         }
 
         internal async Task<(List<ReportTracking>, List<ReportTracking>)> MapRateCardsToCostReports(List<ReportTracking> reports)
