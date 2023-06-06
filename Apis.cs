@@ -144,6 +144,7 @@ namespace AzureBillingV2
                         {
                             Thread.Sleep(randomGen.Next(4000,8000));
                         }
+                        semaphore.Release();
                         return await RequestCostDetailsReport(tracker, start, end, tenantId, iteration++);
                     }
                     else
@@ -160,7 +161,7 @@ namespace AzureBillingV2
             }
             finally
             {
-                semaphore.Release();
+                try { semaphore.Release(); } catch { }
             }
             tracker.Success = false;
             return tracker;
@@ -195,6 +196,7 @@ namespace AzureBillingV2
                     else if (iteration < 10)
                     {
                         _logger.LogInformation($"Report status for subscription {tracker.SubscriptionId} is: {status.Status.Trim()}. Checking again...");
+                        semaphore.Release();
                         Thread.Sleep(3000);
                         return await GetReportStatusBlobUrl(tracker, tenantId, iteration);
                     }
@@ -205,6 +207,7 @@ namespace AzureBillingV2
                 if (iteration < 10)
                 {
                     _logger.LogInformation($"Error checking status for subscription {tracker.SubscriptionId}: {exe.Message}. Checking again...");
+                    semaphore.Release();
                     Thread.Sleep(3000);
                     return await GetReportStatusBlobUrl(tracker, tenantId, iteration);
                 }
@@ -391,6 +394,7 @@ namespace AzureBillingV2
                     {
                         _logger.LogInformation($"Get Rate Card for {subscriptionId} returned a {statusCode} return code. Redirecting to Locaton header URL: {result.Headers.Location.ToString()}");
                         apiUrl = result.Headers.Location.ToString();
+                        semaphore.Release();
                         return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration, apiUrl);
                     }
                     else
@@ -412,6 +416,7 @@ namespace AzureBillingV2
                 if (statusCode < 400 && iteration < 3)
                 {
                     _logger.LogInformation($"Retrying rate card information for subscription {subscriptionId}. Iteration {iteration}");
+                    semaphore.Release();
                     await Task.Delay(5000);
                     return await GetRateCardInformation(subscriptionId, tenantId, offerDurableId, currency, locale, regionInfo, iteration);
                 }
