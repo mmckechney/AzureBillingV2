@@ -45,10 +45,12 @@ The HTTP request will return a JSON summary of the report generation as per the 
   - `ManagementGroupId` - the value need to be the Guid Id value of the mangement group
   - `StorageConnectionString` - connection string to the Azure storage account
   - `ContainerName` - name of the storage container to save the billing report CSV. If is does not exist, it will be created at runtime. The name must adhere to the [naming rules](https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names).
-  -`UseLegacyRateCard` - If you need to leverage the [Legacy RateCard APIs](https://learn.microsoft.com/en-us/previous-versions/azure/reference/mt219004(v%3dazure.100)), you can add this configuration setting with the value `true` (default: `false`)
+  - `MaxConcurrency` - maximum number of concurrent tasks the app will run. This can be used to tune memory usage and rate throttling (default: `2`)
+  - `UseLegacyRateCard` - If you need to leverage the [Legacy RateCard APIs](https://learn.microsoft.com/en-us/previous-versions/azure/reference/mt219004(v%3dazure.100)), you can add this configuration setting with the value `true` (default: `false`)
     - Additional configuraiton options when using legacy rate card:
       - `SaveRateCardData` - whether or not to save the Rate Card json file to storage (default: `true`)
       - `SaveRawBillingReport` - whether or not to save raw CSV file (no mapped cost data) to storage (default: `true`)
       - `OfferDurableId` - the offer durable id to use for the legacy rate card API (default: `MS-AZR-0003P`)
+      - `RateCardPerSubscription` - whether or not to retrieve a rate card per subscription or retrieve one rate card for the first subscription and use this for all of the subscriptions (default: `false`). This helps manage memory usage and can be beneficial if all rate cards for the subs is expected to be the same.
 
 **NOTE:** If you have a large number of subscriptions in your management group, you may need to deploy the Function to something other than the "Consumption" tier. This is because the Consumption tier will timeout after 5 minutes.
