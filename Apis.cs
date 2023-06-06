@@ -424,7 +424,7 @@ namespace AzureBillingV2
             return (null, apiUrl,  $"Failed to get Legacy Rate Card for {subscriptionId}. Return status code is: {statusCode} ({reasonPhrase}). {failureMessage}");
         }
 
-        public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker, RateCardData? rateCard = null)
+        public async Task<ReportTracking> MapRateCardToCostReport(ReportTracking tracker, RateCardData rateCard)
         {
             semaphore.Wait();
             List<BillingData> costReport = null;
@@ -437,7 +437,7 @@ namespace AzureBillingV2
                 {
                     try
                     {
-                        var rate = tracker.RateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                        var rate = rateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
                         if (rate != null)
                         {
                             var reportCost = record.costInUsd;

@@ -117,9 +117,10 @@ namespace AzureBillingV2
 
             _logger.LogInformation($"Mapping Legacy Rate Card information to billing data for {reports.Count()} subscriptions");
             var mappingTasks = new List<Task<ReportTracking>>();
+            var defaultRateCard = reports.Where(r => r.RateCard != null).FirstOrDefault().RateCard;
             foreach (var tracker in reports)
             {
-                mappingTasks.Add(apis.MapRateCardToCostReport(tracker));
+                mappingTasks.Add(apis.MapRateCardToCostReport(tracker, tracker.RateCard ?? defaultRateCard));
             }
             var mappingResults = await Task.WhenAll(mappingTasks.ToArray());
             //Update lists of success and failed.
