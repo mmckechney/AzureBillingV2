@@ -131,11 +131,22 @@ namespace AzureBillingV2
             return (successfulReports, failedReports);
         }
 
-        internal async Task<(List<ReportTracking>, List<ReportTracking>)> SaveMappedReportsToStorage(List<ReportTracking> reports, string filePrefix, DateOnly startDate, string containerName, string targetConnectionString)
+        internal async Task<(List<ReportTracking>, List<ReportTracking>)> SaveMappedReportsToStorage(List<ReportTracking> reports, BillingFileType fileType, DateOnly startDate, string containerName, string targetConnectionString)
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
-            
+            string filePrefix = "";
+            switch (fileType)
+            {
+                case BillingFileType.Raw:
+                    filePrefix = "Raw";
+                    break;
+                case BillingFileType.Billing:
+                default:
+                    filePrefix = "Billing";
+                    break;
+
+            }
             _logger.LogInformation($"Saving mapped billing data for {reports.Count()} subscriptions");
             var writeTasks = new List<Task<ReportTracking>>();
             foreach (var tracker in reports)
@@ -153,17 +164,33 @@ namespace AzureBillingV2
             return (successfulReports, failedReports);
         }
 
-        internal async Task<(List<ReportTracking>, List<ReportTracking>)> SaveSubscriptionsRateCardData(List<ReportTracking> reports, DateOnly startDate, string containerName, string targetConnectionString)
+        internal async Task<(List<ReportTracking>, List<ReportTracking>)> SaveSubscriptionsRateCardData(List<ReportTracking> reports, DateOnly startDate, string containerName, string targetConnectionString, bool rateCardPerSubscription)
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
             
             _logger.LogInformation($"Saving rate card data for {reports.Count()} subscriptions");
             var rateCardBlobTasks = new List<Task<ReportTracking>>();
+            var defaultRateCardSub = reports.Where(r => r.RateCard != null).FirstOrDefault()?.SubscriptionId;
             foreach (var tracker in reports)
             {
-                tracker.RateCardBlobName = $"{startDate.ToString("yyyy-MM-dd")}/RateCard-{tracker.SubscriptionId}.json";
-                rateCardBlobTasks.Add(apis.SaveRateCardToStorage(tracker, containerName, targetConnectionString));
+                if (tracker.RateCard != null)
+                {
+                    tracker.RateCardBlobName = $"{startDate.ToString("yyyy-MM-dd")}/RateCard-{tracker.SubscriptionId}.json";
+                    rateCardBlobTasks.Add(apis.SaveRateCardToStorage(tracker, containerName, targetConnectionString));
+                }
+                else
+                {
+                    if(rateCardPerSubscription)
+                    {
+                        _logger.LogWarning($"No rate card data found for subscription {tracker.SubscriptionId}");
+                    }
+                    else
+                    {
+                        tracker.RateCardBlobName = $"{startDate.ToString("yyyy-MM-dd")}/RateCard-{defaultRateCardSub}.json";
+                        _logger.LogInformation($"\"RateCardPerSubscription\" == `false`. Rate information for default subscription saved at {tracker.RateCardBlobName}");
+                    }
+                }
             }
             var rateCardBlobResults = await Task.WhenAll(rateCardBlobTasks.ToArray());
             //Update lists of success and failed.
@@ -175,18 +202,37 @@ namespace AzureBillingV2
             return (successfulReports, failedReports);
         }
 
-        internal async Task<(List<ReportTracking>, List<ReportTracking>)> CopyReportBlobsToTargetStorage(List<ReportTracking> reports, string filePrefix, DateOnly startDate, string containerName, string targetConnectionString)
+        internal async Task<(List<ReportTracking>, List<ReportTracking>)> CopyReportBlobsToTargetStorage(List<ReportTracking> reports, BillingFileType fileType, DateOnly startDate, string containerName, string targetConnectionString)
         {
             var successfulReports = new List<ReportTracking>();
             var failedReports = new List<ReportTracking>();
+            string filePrefix = "";
+            switch (fileType)
+            {
+                case BillingFileType.Raw:
+                    filePrefix = "Raw";
+                    break;
+                case BillingFileType.Billing:
+                default:
+                    filePrefix = "Billing";
+                    break;
+
+            }
             
             // Copy Reports to Blob Storage
             _logger.LogInformation($"Copying {reports.Count()} reports to destination Blob Container");
             var blobCopyTasks = new List<Task<ReportTracking>>();
             foreach (var tracker in reports)
             {
-                tracker.CostDataBlobName = $"{startDate.ToString("yyyy-MM-dd")}/{filePrefix}-{tracker.SubscriptionId}.csv";
-                blobCopyTasks.Add(apis.SaveBlobToStorage(tracker, containerName, targetConnectionString));
+                if (filePrefix.ToLower().StartsWith("billing"))
+                {
+                    tracker.CostDataBlobName = $"{startDate.ToString("yyyy-MM-dd")}/{filePrefix}-{tracker.SubscriptionId}.csv";
+                }
+                else
+                {
+                    tracker.RawCostDataBlobName = $"{startDate.ToString("yyyy-MM-dd")}/{filePrefix}-{tracker.SubscriptionId}.csv";
+                }
+                blobCopyTasks.Add(apis.SaveBlobToStorage(tracker, containerName, targetConnectionString, fileType));
             }
             var blobCopyResults = await Task.WhenAll(blobCopyTasks.ToArray());
             _logger.LogInformation($"Copied {blobCopyResults.Count()} reports to blob storage");
@@ -197,6 +243,14 @@ namespace AzureBillingV2
             _logger.LogInformation($"Successfully copied {successfulReports.Count()} reports to destination Blob Container");
 
             return (successfulReports, failedReports);
+        }
+    }
+
+    public static class Extensions
+    {
+        public static string FirstUpper(this string val)
+        {
+            return Char.ToUpper(val[0]) + val.Substring(1);
         }
     }
 }

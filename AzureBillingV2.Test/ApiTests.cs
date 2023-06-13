@@ -1,7 +1,11 @@
 using AzureBillingV2.Models;
+using CsvHelper;
 using Grpc.Net.Client.Configuration;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace AzureBilling.Test
 {
@@ -77,18 +81,18 @@ namespace AzureBilling.Test
             foreach(var record in costReport)
             {
 
-                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.MeterId).FirstOrDefault();
                 if(rate != null)
                 {
-                    var reportCost = record.costInUsd;
-                    var calcCost = rate.MeterRates.BaseRate * record.quantity;
+                    var reportCost = record.CostInBillingCurrency;
+                    var calcCost = rate.MeterRates.BaseRate * record.Quantity;
                     double delta = 0;
                     if (calcCost != 0 && reportCost != 0)
                     {
                         delta = reportCost / calcCost;
                     }
                   
-                    Assert.IsTrue(delta < 2 || delta > 0.7, $"Calculated delta for {record.meterName} is {delta}. Report Value: {reportCost}; Calculated Value: {calcCost}");
+                    Assert.IsTrue(delta < 2 || delta > 0.7, $"Calculated delta for {record.MeterName} is {delta}. Report Value: {reportCost}; Calculated Value: {calcCost}");
 
                 }
            
@@ -110,20 +114,50 @@ namespace AzureBilling.Test
             foreach (var record in costReport)
             {
 
-                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                var rate = rateCard.Item1.Meters.Where(m => m.MeterId == record.MeterId).FirstOrDefault();
                 if (rate != null)
                 {
-                    var reportCost = record.costInUsd;
-                    var calcCost = rate.MeterRates.BaseRate * record.quantity;
+                    var reportCost = record.CostInBillingCurrency;
+                    var calcCost = rate.MeterRates.BaseRate * record.Quantity;
                     double delta = 0;
                     if (calcCost != 0 && reportCost != 0)
                     {
                         delta = reportCost / calcCost;
                     }
 
-                    Assert.IsTrue(delta < 2 || delta > 0.7, $"Calculated delta for {record.meterName} is {delta}. Report Value: {reportCost}; Calculated Value: {calcCost}");
+                    Assert.IsTrue(delta < 2 || delta > 0.7, $"Calculated delta for {record.MeterName} is {delta}. Report Value: {reportCost}; Calculated Value: {calcCost}");
 
                 }
+                
+            }
+
+        }
+
+        [DataTestMethod]
+        [DataRow("0d901325-d643-4db7-ae90-58b4e3834629", "16b3c013-d300-468d-ac64-7eda0820b6d3")]
+        public async Task MatchRateCardToBilling(string subscriptionId, string tenantId)
+        {
+                        
+            var rateCardJsonFile = _config["Values:RateCardFile"];
+            var rawBillingCsvFile = _config["Values:RawBillingFile"];
+            var rateCard = JsonSerializer.Deserialize<RateCardData>(File.ReadAllText(rateCardJsonFile));
+            Assert.IsNotNull(rateCard);
+
+            List<BillingData> billData = new List<BillingData>();
+            var csvContent = File.ReadAllText(rawBillingCsvFile);
+            using (var sr = new StringReader(csvContent))
+            {
+
+                var csv = new CsvReader(sr, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null });
+                billData = csv.GetRecords<BillingData>().ToList();
+            }
+
+
+            foreach (var record in billData)
+            {
+
+                var rate = rateCard.Meters.Where(m => m.MeterId == record.MeterId).FirstOrDefault();
+                Assert.IsNotNull(rate,$"The billing data meter ID of '{record.MeterId}' was not found in the rate card");
 
             }
 

@@ -3,7 +3,7 @@
 This repo contains the code for a sample Azure Function to retrieve the daily billing data for all subscriptions in an Azure Management Group. It uses an HTTP trigger to start the report generation.
 
 The resulting CSV files (one per subscription found) are stored in an Azure Storage Account you define.
-The information is retieved via the Azure Cost Management APIs using the following process:
+The information is retieved via the Azure Cost Management APIs using t{ get; set; } = ""he following process:
 
 1. [Request report generation](https://learn.microsoft.com/en-us/rest/api/cost-management/generate-cost-details-report/create-operation?tabs=HTTP) for all of the subscriptions in your managment group. The Management group set in the `ManagementGroupId` key in the configuration. The report is generated for the previous day by default or via a `startDate` parameter in the query string.
 2. Check the status of each report generation and waits until they are all complete.
@@ -17,25 +17,34 @@ The HTTP request will return a JSON summary of the report generation as per the 
   "managementGroupId": "XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
   "startDate": "2023-05-03T00:00:00",
   "endDate": "2023-05-03T23:59:59.999",
-  "hasFailures": false,
+  "success": true,
   "failureMessage": null,
   "SubscriptionReports": [
     {
       "subscriptionName": "My Sub name",
       "subscriptionId": "XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "tenantId": "YYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY",
       "reportStatusUrl": "https://management.azure.com/subscriptions/XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/providers/Microsoft.CostManagement/costDetailsOperationResults/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx?api-version=2022-10-01",
       "reportBlobSas": "https://ccmreportstoragewestus3.blob.core.windows.net/armmusagedetailsreportdownloadcontainer/20230504/xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx?sv=2018-03-28\u0026sr=b\u0026sig=6TFT5jBp1QRYIrApdrBd4vl%2FTNgeLCw0NViskYMXXl0%3D\u0026spr=https\u0026st=2023-05-04T14%3A30%3A21Z\u0026se=2023-05-05T02%3A35%3A21Z\u0026sp=r",
-      "destinationBlobName": "https://XXXXXXX.blob.core.windows.net/billing/2023-05-03/Billing-XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.csv",
+      "offerDurableId": "MS-AZR-#####",
+      "rateCardUrl": "https://management.azure.com/subscriptions/XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/providers/Microsoft.Commerce/RateCard?api-version=2015-06-01-preview&$filter=OfferDurableId eq 'MS-AZR-#####' and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'",
+      "rateCardJsonBlobName": "https://XXXXXXXXXX.blob.core.windows.net/billing/2023-06-10/RateCard-XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.json",
+      "rawCostDataBlobName": "https://XXXXXXXXXX.blob.core.windows.net/billing/2023-06-10/Raw-XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.csv",
+      "costDataBlobName": "https://XXXXXXXXXX.blob.core.windows.net/billing/2023-06-10/Billing-XXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.csv",
       "success": true,
-      "statusMessage": "Successfully saved report to Blob storage"
+      "statusMessage": [
+            "Successfully saved report to Blob storage.",
+            "Successfully saved rate card mapped report to Blob storage.",
+            "Successfully saved rate card to Blob storage."
+        ]
     }
-  ]
+    ]
 }
 ```
 
 ----
 
-## Set-up Reqirements
+## Set-up Requirements
 
 - Azure Function App configured with the .NET 7 isolated runtime
   - Build and deploy this project to that Function App

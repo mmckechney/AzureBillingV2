@@ -89,7 +89,7 @@ namespace AzureBillingV2
             _logger.LogInformation($"Found {subs.Count()} subscriptions");
             if(subs.Count == 0 && !string.IsNullOrWhiteSpace(failMsg))
             {
-                finalResults.HasFailures = true;
+                finalResults.Success = false;
                 finalResults.FailureMessage = failMsg;
             }
 
@@ -111,16 +111,16 @@ namespace AzureBillingV2
 
                 if (saveRawBillingReport)
                 {
-                    (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Raw", startDate, containerName, targetConnectionString);
+                    (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, BillingFileType.Raw, startDate, containerName, targetConnectionString);
                     failedReports.AddRange(stepFailedReports);
                 }
 
-                (successfulReports, stepFailedReports) = await orchestration.SaveMappedReportsToStorage(successfulReports, "Billing", startDate,containerName, targetConnectionString);
+                (successfulReports, stepFailedReports) = await orchestration.SaveMappedReportsToStorage(successfulReports, BillingFileType.Billing, startDate,containerName, targetConnectionString);
                 failedReports.AddRange(stepFailedReports);
 
                 if (saveRateCardData)
                 {
-                    (successfulReports, stepFailedReports) = await orchestration.SaveSubscriptionsRateCardData(successfulReports, startDate, containerName, targetConnectionString);
+                    (successfulReports, stepFailedReports) = await orchestration.SaveSubscriptionsRateCardData(successfulReports, startDate, containerName, targetConnectionString, rateCardPerSubscription);
                     failedReports.AddRange(stepFailedReports);
                 }
 
@@ -128,21 +128,21 @@ namespace AzureBillingV2
             }
             else
             {
-                (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, "Billing", startDate, containerName, targetConnectionString);
+                (successfulReports, stepFailedReports) = await orchestration.CopyReportBlobsToTargetStorage(successfulReports, BillingFileType.Billing, startDate, containerName, targetConnectionString);
                 failedReports.AddRange(stepFailedReports);
             }
 
             
             if (failedReports.Count == 0 && successfulReports.Count > 0)
             {
-                finalResults.HasFailures = false;
+                finalResults.Success = true;
             }
             finalResults.SubscriptionReports.AddRange(successfulReports);
             finalResults.SubscriptionReports.AddRange(failedReports);
 
             var final = JsonSerializer.Serialize<FinalResults> (finalResults, new JsonSerializerOptions() { WriteIndented = true});
             
-            var response = req.CreateResponse(finalResults.HasFailures ? HttpStatusCode.FailedDependency : HttpStatusCode.OK);
+            var response = req.CreateResponse(finalResults.Success ? HttpStatusCode.OK : HttpStatusCode.FailedDependency);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
 
             response.WriteString(final);

@@ -77,70 +77,69 @@ namespace AzureBillingV2.Models
             //Map(m => m.benefitId);
 
         }
-        public string invoiceId { get; set; } = "";
-        public string previousInvoiceId { get; set; } = "";
-        public string billingAccountId { get; set; } = "";
-        public string billingAccountName { get; set; } = "";
-        public string billingProfileId { get; set; } = "";
-        public string billingProfileName { get; set; } = "";
-        public string invoiceSectionId { get; set; } = "";
-        public string invoiceSectionName { get; set; } = "";
-        public string resellerName { get; set; } = "";
-        public string resellerMpnId { get; set; } = "";
-        public string costCenter { get; set; } = "";
-        public string billingPeriodEndDate { get; set; } = "";
-        public string billingPeriodStartDate { get; set; } = "";
-        public string servicePeriodEndDate { get; set; } = "";
-        public string servicePeriodStartDate { get; set; } = "";
-        public string date { get; set; } = "";
-        public string serviceFamily { get; set; } = "";
-        public string productOrderId { get; set; } = "";
-        public string productOrderName { get; set; } = "";
-        public string consumedService { get; set; } = "";
-        public string meterId { get; set; } = "";
-        public string meterName { get; set; } = "";
-        public string meterCategory { get; set; } = "";
-        public string meterSubCategory { get; set; } = "";
-        public string meterRegion { get; set; } = "";
-        public string ProductId { get; set; } = "";
-        public string ProductName { get; set; } = "";
+        public string InvoiceSectionName { get; set; } = "";
+        public string AccountName { get; set; } = "";
+        public string AccountOwnerId { get; set; } = "";
         public string SubscriptionId { get; set; } = "";
-        public string subscriptionName { get; set; } = "";
-        public string publisherType { get; set; } = "";
-        public string publisherId { get; set; } = "";
-        public string publisherName { get; set; } = "";
-        public string resourceGroupName { get; set; } = "";
+        public string SubscriptionName { get; set; } = "";
+        public string ResourceGroup { get; set; } = "";
+        public string ResourceLocation { get; set; } = "";
+        public string Date { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public string MeterCategory { get; set; } = "";
+        public string MeterSubCategory { get; set; } = "";
+        public string MeterId { get; set; } = "";
+        public string MeterName { get; set; } = "";
+        public string MeterRegion { get; set; } = "";
+        public string UnitOfMeasure { get; set; } = "";
+        public double Quantity { get; set; } = 0.0;
+        public double EffectivePrice { get; set; } = 0.0;
+        public double CostInBillingCurrency { get; set; } = 0.0;
+        public string CostCenter { get; set; } = "";
+        public string ConsumedService { get; set; } = "";
         public string ResourceId { get; set; } = "";
-        public string resourceLocation { get; set; } = "";
-        public string location { get; set; } = "";
-        public double effectivePrice { get; set; } = 0.0;
-        public double quantity { get; set; } = 0.0;
-        public string unitOfMeasure { get; set; } = "";
-        public string chargeType { get; set; } = "";
-        public string billingCurrency { get; set; } = "";
-        public string pricingCurrency { get; set; } = "";
-        public double costInBillingCurrency { get; set; } = 0.0;
-        public double costInPricingCurrency { get; set; } = 0.0;
-        public double costInUsd { get; set; } = -1.0;
-        public double paygCostInBillingCurrency { get; set; } = 0.0;
-        public double paygCostInUsd { get; set; } = 0.0;
-        public double exchangeRatePricingToBilling { get; set; } = 0.0;
-        public string exchangeRateDate { get; set; } = "";
-        public string isAzureCreditEligible { get; set; } = "";
-        public string serviceInfo1 { get; set; } = "";
-        public string serviceInfo2 { get; set; } = "";
-        public string additionalInfo { get; set; } = "";
-        public string tags { get; set; } = "";
-        public string PayGPrice { get; set; } = "";
-        public string frequency { get; set; } = "";
-        public string term { get; set; } = "";
-        public string reservationId { get; set; } = "";
-        public string reservationName { get; set; } = "";
-        public string pricingModel { get; set; } = "";
-        public double unitPrice { get; set; } = 0.0;
-        public string costAllocationRuleName { get; set; } = "";
+        public string Tags { get; set; } = "";
+        public string OfferId { get; set; } = "";
+        public string AdditionalInfo { get; set; } = "";
+        public string ServiceInfo1 { get; set; } = "";
+        public string ServiceInfo2 { get; set; } = "";
+        public string ResourceName { get; set; } = "";
+        public string ReservationId { get; set; } = "";
+        public string ReservationName { get; set; } = "";
+        public double UnitPrice { get; set; } = 0.0;
+        public string ProductOrderId { get; set; } = "";
+        public string ProductOrderName { get; set; } = "";
+        public string Term { get; set; } = "";
+        public string PublisherType { get; set; } = "";
+        public string PublisherName { get; set; } = "";
+        public string ChargeType { get; set; } = "";
+        public string Frequency { get; set; } = "";
+        public string PricingModel { get; set; } = "";
+        public string AvailabilityZone { get; set; } = "";
+        public string BillingAccountId { get; set; } = "";
+        public string BillingAccountName { get; set; } = "";
+        public string BillingCurrencyCode { get; set; } = "";
+        public string BillingPeriodStartDate { get; set; } = "";
+        public string BillingPeriodEndDate { get; set; } = "";
+        public string BillingProfileId { get; set; } = "";
+        public string BillingProfileName { get; set; } = "";
+        public string InvoiceSectionId { get; set; } = "";
+        public string IsAzureCreditEligible { get; set; } = "";
+        public string PartNumber { get; set; } = "";
+        public double PayGPrice { get; set; } = 0.0;
+        public string PlanName { get; set; } = "";
+        public string ServiceFamily { get; set; } = "";
+        public string CostAllocationRuleName { get; set; } = "";
         public string benefitId { get; set; } = "";
+        public string benefitName { get; set; } = "";
 
 
+
+    }
+
+    public enum BillingFileType
+    {
+        Raw, 
+        Billing
     }
 }

@@ -225,36 +225,55 @@ namespace AzureBillingV2
             return tracker;
         }
 
-        public async Task<ReportTracking> SaveBlobToStorage(ReportTracking tracker, string containerName, string targetConnectionString)
+        public async Task<ReportTracking> SaveBlobToStorage(ReportTracking tracker, string containerName, string targetConnectionString, BillingFileType fileType)
         {
             semaphore.Wait();
+            string blobName = "";
             try
             {
-                _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {tracker.CostDataBlobName}");
+                switch(fileType)
+                {
+                    case BillingFileType.Raw:
+                        blobName = tracker.RawCostDataBlobName;
+                        break;
+                    case BillingFileType.Billing:
+                        blobName = tracker.CostDataBlobName;
+                        break;
+                }
+                _logger.LogInformation($"Saving Cost Report for subscription {tracker.SubscriptionId} to {blobName}");
                 containerName = containerName.ToLower();
                 BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
                 containerClient.CreateIfNotExists();
                 
-                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, tracker.CostDataBlobName);
+                BlobClient targetClient = new BlobClient(targetConnectionString, containerName, blobName);
                 var sourceUri = new Uri(tracker.ReportBlobSas);
                 var copyOperation = await targetClient.StartCopyFromUriAsync(sourceUri);
                 var result = await copyOperation.WaitForCompletionAsync();
                 if (result.GetRawResponse().Status < 300)
                 {
-                    tracker.CostDataBlobName = targetClient.Uri.ToString();
+
+                    switch (fileType)
+                    {
+                        case BillingFileType.Raw:
+                            tracker.RawCostDataBlobName = targetClient.Uri.ToString();
+                            break;
+                        case BillingFileType.Billing:
+                            tracker.CostDataBlobName = targetClient.Uri.ToString();
+                            break;
+                    }
                     tracker.StatusMessage.Add("Successfully saved report to Blob storage.");
 
                     return tracker;
                 }
                 else
                 {
-                    tracker.StatusMessage.Add($"Failed to copy target blob file '{tracker.CostDataBlobName}': {result.GetRawResponse().ReasonPhrase}");
+                    tracker.StatusMessage.Add($"Failed to copy target blob file '{blobName}': {result.GetRawResponse().ReasonPhrase}");
                     _logger.LogError(tracker.StatusMessage.ToLines());
                 }
             }
             catch (Exception exe)
             {
-                tracker.StatusMessage.Add($"Failed to copy to target blob file: {tracker.CostDataBlobName} -- {exe.Message}");
+                tracker.StatusMessage.Add($"Failed to copy to target blob file: {blobName} -- {exe.Message}");
                 _logger.LogError(exe, tracker.StatusMessage.ToLines());
             }
             finally
@@ -334,7 +353,13 @@ namespace AzureBillingV2
                 using (var sr = new StringReader(csvContent))
                 {
 
-                    var csv = new CsvReader(sr, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, HeaderValidated = null, MissingFieldFound = null });
+                    var csv = new CsvReader(sr, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = true,
+                        HeaderValidated = null,
+                        MissingFieldFound = null,
+                        PrepareHeaderForMatch = args => args.Header.FirstUpper()
+                    });
                     //csv.Context.RegisterClassMap<BillingData>();
                     billData = csv.GetRecords<BillingData>().ToList();
                 }
@@ -442,18 +467,20 @@ namespace AzureBillingV2
                 {
                     try
                     {
-                        var rate = rateCard.Meters.Where(m => m.MeterId == record.meterId).FirstOrDefault();
+                        var rate = rateCard.Meters.Where(m => m.MeterId == record.MeterId).FirstOrDefault();
                         if (rate != null)
                         {
-                            var reportCost = record.costInUsd;
-                            var calcCost = rate.MeterRates.BaseRate * record.quantity;
-                            record.costInUsd = calcCost;
-                            record.costInBillingCurrency = calcCost;
+                            var reportCost = record.CostInBillingCurrency;
+                            var calcCost = rate.MeterRates.BaseRate * record.Quantity;
+                            record.CostInBillingCurrency = calcCost;
+                        }else
+                        {
+                            _logger.LogWarning($"Unable to match billing data MeterId '{record.MeterId}' ({record.ProductName})");
                         }
                     }
                     catch (Exception exe)
                     {
-                        _logger.LogWarning($"Unable to map rate card to cost report for meterid {record.meterId}. {exe.Message}");
+                        _logger.LogWarning($"Unable to map rate card to cost report for meterid {record.MeterId}. {exe.Message}");
                     }
 
 
@@ -524,6 +551,11 @@ namespace AzureBillingV2
             try
             {
                 _logger.LogInformation($"Saving rate card data for subscription {tracker.SubscriptionId} to {tracker.RateCardBlobName}");
+
+                containerName = containerName.ToLower();
+                BlobContainerClient containerClient = new BlobContainerClient(targetConnectionString, containerName);
+                containerClient.CreateIfNotExists();
+
                 var rateCard = JsonSerializer.Serialize<RateCardData>(tracker.RateCard, new JsonSerializerOptions() { WriteIndented = true});
                 BlobClient rateCardClient = new BlobClient(targetConnectionString, containerName, tracker.RateCardBlobName);
                 var rateCardClientWrite = await rateCardClient.UploadAsync(BinaryData.FromString(rateCard), true);

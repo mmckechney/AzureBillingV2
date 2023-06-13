@@ -18,8 +18,8 @@ namespace AzureBillingV2.Models
         [JsonPropertyName("endDate")]
         public DateTime EndDate { get; set; }
 
-        [JsonPropertyName("hasFailures")]
-        public bool HasFailures { get; set; } = true;
+        [JsonPropertyName("success")]
+        public bool Success { get; set; } = true;
        
         [JsonPropertyName("failureMessage")]
         public string FailureMessage { get; set; }

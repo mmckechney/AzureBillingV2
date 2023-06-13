@@ -26,17 +26,20 @@ namespace AzureBillingV2.Models
         [JsonPropertyName("reportBlobSas")]
         public string ReportBlobSas { get; set; }
 
-        [JsonPropertyName("costDataBlobName")]
-        public string CostDataBlobName { get; set; }
-
         [JsonPropertyName("offerDurableId")]
         public string OfferDurableId { get; set; }
 
         [JsonPropertyName("rateCardUrl")]
         public string RateCardUrl { get; set; }
 
-        [JsonPropertyName("rateCardBlobName")]
+        [JsonPropertyName("rateCardJsonBlobName")]
         public string RateCardBlobName { get; set; }
+
+        [JsonPropertyName("rawCostDataBlobName")]
+        public string RawCostDataBlobName { get; set; }
+
+        [JsonPropertyName("costDataBlobName")]
+        public string CostDataBlobName { get; set; }
 
         [JsonPropertyName("success")]
         public bool Success { get; set; } = true;
